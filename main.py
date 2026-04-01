@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ValidationError
 from typing import List
 from src.services.user_input_service import UserInputService
+from src.services.embedding_service import EmbeddingService
 
 app = FastAPI(title="RAG System API", version="1.0.0")
 
@@ -14,8 +15,14 @@ class ChunkResponse(BaseModel):
     total_chunks: int
     chunks: List[str]
 
+class EmbeddingResponse(BaseModel):
+    total_chunks: int
+    embedding_dimensions: int
+    chunks_with_embeddings: List[dict]
+
 # Initialize services
 user_input_service = UserInputService()
+embedding_service = EmbeddingService()
 
 @app.exception_handler(ValidationError)
 async def validation_exception_handler(request: Request, exc: ValidationError):
@@ -28,6 +35,44 @@ async def validation_exception_handler(request: Request, exc: ValidationError):
             "message": "Please check your request format"
         }
     )
+
+@app.post("/generate-embeddings", response_model=EmbeddingResponse)
+async def generate_embeddings(input_data: TextInput):
+    """Generate embeddings for text chunks."""
+    try:
+        print(f"Received text for embedding: {len(input_data.text)} characters")
+        
+        # Step 1: Create chunks
+        chunks = user_input_service.chunker.chunk_text(input_data.text)
+        total_chunks = len(chunks)
+        
+        print(f"Created {total_chunks} chunks")
+        
+        # Step 2: Generate embeddings
+        embeddings = embedding_service.generate_embeddings(chunks)
+        embedding_dimensions = embedding_service.get_embedding_dimensions()
+        
+        # Step 3: Combine chunks with embeddings
+        chunks_with_embeddings = []
+        for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
+            chunks_with_embeddings.append({
+                "chunk_id": i + 1,
+                "chunk_text": chunk,
+                "embedding": embedding,
+                "embedding_preview": embedding[:5]  # Show first 5 dimensions for preview
+            })
+        
+        print(f"Generated embeddings for {total_chunks} chunks ({embedding_dimensions} dimensions each)")
+        
+        return EmbeddingResponse(
+            total_chunks=total_chunks,
+            embedding_dimensions=embedding_dimensions,
+            chunks_with_embeddings=chunks_with_embeddings
+        )
+        
+    except Exception as e:
+        print(f"Error generating embeddings: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error generating embeddings: {str(e)}")
 
 @app.post("/process-text", response_model=ChunkResponse)
 async def process_text(input_data: TextInput):
@@ -78,6 +123,7 @@ async def root():
             "endpoints": {
                 "health": "/health",
                 "process_text": "/process-text (POST)",
+                "generate_embeddings": "/generate-embeddings (POST)",
                 "docs": "/docs"
             }
         }
