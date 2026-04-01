@@ -5,12 +5,12 @@ from typing import List
 class TextChunker:
     """Handles text chunking operations."""
     
-    def __init__(self, max_words: int = 100):
+    def __init__(self, max_words: int = 50):
         """
         Initialize the TextChunker.
         
         Args:
-            max_words (int): Maximum words per chunk (default: 100)
+            max_words (int): Maximum words per chunk (default: 50)
         """
         self.max_words = max_words
     
