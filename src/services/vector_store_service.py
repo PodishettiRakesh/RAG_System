@@ -90,6 +90,48 @@ class VectorStoreService:
             for i, chunk in enumerate(self.stored_chunks)
         ]
     
+    def search_similar(self, query_text: str, k: int = 3) -> List[Dict]:
+        """
+        Search for similar chunks using query text.
+        
+        Args:
+            query_text (str): Query text to search for
+            k (int): Number of similar chunks to return (default: 3)
+        
+        Returns:
+            List[Dict]: List of similar chunks with distances
+        """
+        print(f"Searching for top {k} similar chunks to query: '{query_text[:50]}...'")
+        
+        # Generate embedding for query
+        query_embeddings = self.embedding_service.generate_embeddings([query_text])
+        query_vector = np.array([query_embeddings[0]], dtype=np.float32)
+        
+        # Search in FAISS index
+        distances, indices = self.index.search(query_vector, k)
+        
+        # Prepare results
+        results = []
+        for i, (distance, idx) in enumerate(zip(distances[0], indices[0])):
+            if idx < len(self.stored_chunks):  # Valid index
+                chunk_text = self.stored_chunks[idx]
+                results.append({
+                    "rank": i + 1,
+                    "chunk_id": int(idx),  # Convert numpy.int64 to int
+                    "chunk_text": chunk_text,
+                    "similarity_score": float(distance),  # Convert numpy.float32 to float
+                    "distance_type": "L2 (Euclidean)",
+                    "words": len(chunk_text.split()),
+                    "characters": len(chunk_text),
+                    "lower_is_better": True  # Lower L2 distance = more similar
+                })
+        
+        print(f"Found {len(results)} similar chunks")
+        for result in results:
+            print(f"  Rank {result['rank']}: Chunk {result['chunk_id']} (distance: {result['similarity_score']:.4f})")
+        
+        return results
+    
     def get_detailed_structure(self) -> Dict:
         """
         Get detailed structure of FAISS storage.
