@@ -3,7 +3,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ValidationError
 from typing import List
 from src.services.user_input_service import UserInputService
-from src.services.embedding_service import EmbeddingService
+from src.services.simple_embedding_service import SimpleEmbeddingService
+from src.services.vector_store_service import VectorStoreService
 
 app = FastAPI(title="RAG System API", version="1.0.0")
 
@@ -20,9 +21,15 @@ class EmbeddingResponse(BaseModel):
     embedding_dimensions: int
     chunks_with_embeddings: List[dict]
 
+class StoreResponse(BaseModel):
+    chunks_added: int
+    total_chunks: int
+    stats: dict
+
 # Initialize services
 user_input_service = UserInputService()
-embedding_service = EmbeddingService()
+embedding_service = SimpleEmbeddingService()
+vector_store = VectorStoreService()
 
 @app.exception_handler(ValidationError)
 async def validation_exception_handler(request: Request, exc: ValidationError):
@@ -36,6 +43,59 @@ async def validation_exception_handler(request: Request, exc: ValidationError):
         }
     )
 
+@app.post("/store-chunks", response_model=StoreResponse)
+async def store_chunks(input_data: TextInput):
+    """Store text chunks in vector database."""
+    try:
+        print(f"Storing chunks for text: {len(input_data.text)} characters")
+        
+        # Step 1: Create chunks
+        chunks = user_input_service.chunker.chunk_text(input_data.text)
+        
+        # Step 2: Store chunks in vector database
+        chunks_added = vector_store.add_chunks(chunks)
+        
+        # Step 3: Get updated stats
+        stats = vector_store.get_stats()
+        
+        print(f"Stored {chunks_added} chunks successfully")
+        
+        return StoreResponse(
+            chunks_added=chunks_added,
+            total_chunks=stats["total_chunks"],
+            stats=stats
+        )
+        
+    except Exception as e:
+        print(f"Error storing chunks: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error storing chunks: {str(e)}")
+
+@app.get("/store-stats")
+async def get_store_stats():
+    """Get vector store statistics."""
+    try:
+        stats = vector_store.get_stats()
+        return JSONResponse(
+            status_code=200,
+            content=stats
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting stats: {str(e)}")
+
+@app.get("/stored-chunks")
+async def get_stored_chunks():
+    """Get all stored chunks."""
+    try:
+        chunks = vector_store.get_all_chunks()
+        return JSONResponse(
+            status_code=200,
+            content={
+                "chunks": chunks,
+                "total": len(chunks)
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting chunks: {str(e)}")
 @app.post("/generate-embeddings", response_model=EmbeddingResponse)
 async def generate_embeddings(input_data: TextInput):
     """Generate embeddings for text chunks."""
@@ -113,6 +173,18 @@ async def health_check():
         }
     )
 
+@app.get("/detailed-structure")
+async def get_detailed_structure():
+    """Get detailed FAISS storage structure."""
+    try:
+        structure = vector_store.get_detailed_structure()
+        return JSONResponse(
+            status_code=200,
+            content=structure
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting structure: {str(e)}")
+
 @app.get("/")
 async def root():
     """Root endpoint."""
@@ -124,6 +196,10 @@ async def root():
                 "health": "/health",
                 "process_text": "/process-text (POST)",
                 "generate_embeddings": "/generate-embeddings (POST)",
+                "store_chunks": "/store-chunks (POST)",
+                "store_stats": "/store-stats (GET)",
+                "stored_chunks": "/stored-chunks (GET)",
+                "detailed_structure": "/detailed-structure (GET)",
                 "docs": "/docs"
             }
         }
