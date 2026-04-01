@@ -21,6 +21,12 @@ class EmbeddingResponse(BaseModel):
     embedding_dimensions: int
     chunks_with_embeddings: List[dict]
 
+class SearchResponse(BaseModel):
+    query: str
+    k: int
+    total_found: int
+    results: List[dict]
+
 class StoreResponse(BaseModel):
     chunks_added: int
     total_chunks: int
@@ -173,6 +179,41 @@ async def health_check():
         }
     )
 
+@app.post("/search", response_model=SearchResponse)
+async def search_similar_chunks(query_data: dict):
+    """Search for similar chunks using query text."""
+    try:
+        # Extract query and k from request
+        query = query_data.get("query", "")
+        k = query_data.get("k", 3)
+        
+        print(f"Search request: query='{query[:50]}...', k={k}")
+        
+        # Validate inputs
+        if not query.strip():
+            raise HTTPException(status_code=400, detail="Query cannot be empty")
+        
+        if k <= 0:
+            raise HTTPException(status_code=400, detail="k must be positive")
+        
+        # Search for similar chunks
+        results = vector_store.search_similar(query, k)
+        
+        print(f"Search completed: found {len(results)} results")
+        
+        return SearchResponse(
+            query=query,
+            k=k,
+            total_found=len(results),
+            results=results
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error searching: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error searching: {str(e)}")
+
 @app.get("/detailed-structure")
 async def get_detailed_structure():
     """Get detailed FAISS storage structure."""
@@ -199,6 +240,7 @@ async def root():
                 "store_chunks": "/store-chunks (POST)",
                 "store_stats": "/store-stats (GET)",
                 "stored_chunks": "/stored-chunks (GET)",
+                "search": "/search (POST)",
                 "detailed_structure": "/detailed-structure (GET)",
                 "docs": "/docs"
             }
