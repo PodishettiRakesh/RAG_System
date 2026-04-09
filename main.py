@@ -5,6 +5,7 @@ from typing import List
 from src.services.user_input_service import UserInputService
 from src.services.simple_embedding_service import SimpleEmbeddingService
 from src.services.vector_store_service import VectorStoreService
+from src.services.llm_service import LLMService
 
 app = FastAPI(title="RAG System API", version="1.0.0")
 
@@ -21,6 +22,14 @@ class EmbeddingResponse(BaseModel):
     embedding_dimensions: int
     chunks_with_embeddings: List[dict]
 
+class RAGResponse(BaseModel):
+    query: str
+    response: str
+    context_used: int
+    context_preview: str
+    model_info: dict
+    tokens_used: int
+
 class SearchResponse(BaseModel):
     query: str
     k: int
@@ -36,6 +45,7 @@ class StoreResponse(BaseModel):
 user_input_service = UserInputService()
 embedding_service = SimpleEmbeddingService()
 vector_store = VectorStoreService()
+llm_service = LLMService()
 
 @app.exception_handler(ValidationError)
 async def validation_exception_handler(request: Request, exc: ValidationError):
@@ -179,6 +189,70 @@ async def health_check():
         }
     )
 
+@app.post("/rag", response_model=RAGResponse)
+async def rag_query(query_data: dict):
+    """Complete RAG pipeline: Search + LLM generation."""
+    try:
+        # Extract query and k from request
+        query = query_data.get("query", "")
+        k = query_data.get("k", 3)
+        max_length = query_data.get("max_length", 200)
+        
+        print(f"🚀 RAG Query: '{query[:50]}...', k={k}")
+        
+        # Validate inputs
+        if not query.strip():
+            raise HTTPException(status_code=400, detail="Query cannot be empty")
+        
+        if k <= 0:
+            raise HTTPException(status_code=400, detail="k must be positive")
+        
+        # Step 1: Search for relevant chunks
+        print("🔍 Step 1: Searching for relevant chunks...")
+        search_results = vector_store.search_similar(query, k)
+        
+        if not search_results:
+            raise HTTPException(status_code=404, detail="No relevant information found")
+        
+        print(f"📚 Found {len(search_results)} relevant chunks")
+        
+        # Step 2: Generate LLM response
+        print("🤖 Step 2: Generating LLM response...")
+        llm_result = llm_service.generate_response(query, search_results, max_length)
+        
+        if llm_result.get("error"):
+            raise HTTPException(status_code=500, detail="Error generating response")
+        
+        # Step 3: Return RAG response
+        print("✅ RAG pipeline completed successfully!")
+        
+        return RAGResponse(
+            query=llm_result["query"],
+            response=llm_result["response"],
+            context_used=llm_result["context_used"],
+            context_preview=llm_result["context_preview"],
+            model_info=llm_result["model_info"],
+            tokens_used=llm_result["tokens_used"]
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ RAG pipeline error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"RAG pipeline error: {str(e)}")
+
+@app.get("/llm-stats")
+async def get_llm_stats():
+    """Get LLM model statistics."""
+    try:
+        stats = llm_service.get_model_stats()
+        return JSONResponse(
+            status_code=200,
+            content=stats
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting LLM stats: {str(e)}")
+
 @app.post("/search", response_model=SearchResponse)
 async def search_similar_chunks(query_data: dict):
     """Search for similar chunks using query text."""
@@ -241,6 +315,8 @@ async def root():
                 "store_stats": "/store-stats (GET)",
                 "stored_chunks": "/stored-chunks (GET)",
                 "search": "/search (POST)",
+                "rag": "/rag (POST)",
+                "llm_stats": "/llm-stats (GET)",
                 "detailed_structure": "/detailed-structure (GET)",
                 "docs": "/docs"
             }
