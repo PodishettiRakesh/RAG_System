@@ -66,7 +66,7 @@ class LLMService:
     
     def create_prompt(self, context: str, query: str) -> str:
         """
-        Create a structured prompt for the LLM.
+        Create a structured prompt for the LLM with enhanced anti-hallucination measures.
         
         Args:
             context (str): Retrieved context
@@ -75,7 +75,14 @@ class LLMService:
         Returns:
             str: Formatted prompt
         """
-        prompt = f"""Answer the following question based ONLY on the provided context. If the context doesn't contain the answer, say "I don't have enough information to answer this question."
+        prompt = f"""You are a helpful AI assistant that answers questions based ONLY on the provided context.
+
+STRICT RULES:
+1. Use ONLY the information in the CONTEXT below
+2. Do NOT make up, infer, or assume any information not explicitly stated in the context
+3. If the context doesn't contain the answer, respond with "I don't have enough information to answer this question based on the provided context."
+4. Do NOT use general knowledge - stick strictly to the given context
+5. If you're unsure about any detail, admit it rather than guessing
 
 CONTEXT:
 {context}
@@ -85,6 +92,43 @@ QUESTION: {query}
 ANSWER:"""
         
         return prompt
+    
+    def _validate_response(self, response: str, context: str, query: str) -> str:
+        """
+        Validate LLM response to detect and prevent hallucinations.
+        
+        Args:
+            response (str): Generated LLM response
+            context (str): Retrieved context
+            query (str): Original user query
+        
+        Returns:
+            str: Validated response
+        """
+        # Check for fallback response
+        if "I don't have enough information" in response:
+            return response
+            
+        # Check if response contains information not in context
+        response_words = set(response.lower().split())
+        context_words = set(context.lower().split())
+        
+        # If response contains many words not in context, flag as potential hallucination
+        non_context_words = response_words - context_words
+        if len(non_context_words) > 5:  # Threshold for potential hallucination
+            return "I don't have enough information to answer this question based on the provided context."
+            
+        # Check for generic knowledge responses
+        generic_indicators = [
+            "in general", "typically", "usually", "commonly", 
+            "as a general rule", "it is known that", "traditionally"
+        ]
+        
+        for indicator in generic_indicators:
+            if indicator in response.lower():
+                return "I don't have enough information to answer this question based on the provided context."
+                
+        return response
     
     def generate_response(self, query: str, search_results: List[Dict], max_length: int = 200) -> Dict:
         """
@@ -110,22 +154,28 @@ ANSWER:"""
             
             print(f"📝 Prompt length: {len(prompt)} characters")
             
-            # Generate response
+            # Generate response with anti-hallucination settings
             response = self.generator(
                 prompt,
                 max_length=max_length,
                 num_return_sequences=1,
-                temperature=0.7,  # Balance between creativity and consistency
+                temperature=0.1,  # Lower temperature for more deterministic responses
                 do_sample=True,
-                pad_token_id=self.generator.tokenizer.eos_token_id
+                pad_token_id=self.generator.tokenizer.eos_token_id,
+                repetition_penalty=1.1,  # Reduce repetition
+                top_k=50,  # Limit token choices
+                top_p=0.9  # Nucleus sampling
             )
             
             generated_text = response[0]['generated_text'].strip()
             
+            # Validate response for potential hallucinations
+            validated_response = self._validate_response(generated_text, context, query)
+            
             # Prepare result
             result = {
                 "query": query,
-                "response": generated_text,
+                "response": validated_response,
                 "context_used": len(search_results),
                 "context_preview": context[:200] + "..." if len(context) > 200 else context,
                 "model_info": {
