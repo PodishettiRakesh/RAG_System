@@ -1,3 +1,4 @@
+import time
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ValidationError, Field
@@ -6,6 +7,7 @@ from src.services.user_input_service import UserInputService
 from src.services.embedding_service import EmbeddingService
 from src.services.vector_store_service import VectorStoreService
 from src.services.llm_service import LLMService
+from src.utils.observability import observability, PerformanceTracker
 
 app = FastAPI(title="RAG System API", version="1.0.0")
 
@@ -78,22 +80,49 @@ async def validation_exception_handler(request: Request, exc: ValidationError):
         }
     )
 
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    """Handle general exceptions including JSON parsing errors."""
+    if "JSON decode error" in str(exc) or "Invalid control character" in str(exc):
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error": "JSON Parsing Error",
+                "message": "Invalid JSON format. Make sure all special characters are properly escaped.",
+                "suggestion": "Use \\n for newlines, \\t for tabs, and \\\ for quotes in JSON strings"
+            }
+        )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Internal Server Error",
+            "message": str(exc)
+        }
+    )
+
 @app.post("/store-chunks", response_model=StoreResponse)
 async def store_chunks(input_data: TextInput):
     """Store text chunks in vector database."""
     try:
-        print(f"Storing chunks for text: {len(input_data.text)} characters")
+        print(f"\n=== API CALL: /store-chunks ===")
+        print(f"Request received at: {time.strftime('%H:%M:%S')}")
+        print(f"Text length: {len(input_data.text)} characters")
+        print(f"Text preview: {input_data.text[:100]}...")
         
         # Step 1: Create chunks
         chunks = user_input_service.chunker.chunk_text(input_data.text)
+        print(f"Generated {len(chunks)} chunks")
         
         # Step 2: Store chunks in vector database
         chunks_added = vector_store.add_chunks(chunks)
+        print(f"Added {chunks_added} chunks to vector store")
         
         # Step 3: Get updated stats
         stats = vector_store.get_stats()
         
-        print(f"Stored {chunks_added} chunks successfully")
+        print(f"✅ Successfully stored {chunks_added} chunks")
+        print(f"Total chunks in storage: {stats['total_chunks']}")
+        print("=" * 50)
         
         return StoreResponse(
             chunks_added=chunks_added,
@@ -102,26 +131,39 @@ async def store_chunks(input_data: TextInput):
         )
         
     except Exception as e:
-        print(f"Error storing chunks: {str(e)}")
+        print(f"❌ Error storing chunks: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error storing chunks: {str(e)}")
 
 @app.get("/store-stats")
 async def get_store_stats():
     """Get vector store statistics."""
+    print(f"\n=== API CALL: /store-stats ===")
+    print(f"Request received at: {time.strftime('%H:%M:%S')}")
+    print("Getting vector store statistics")
+    
     try:
         stats = vector_store.get_stats()
+        print(f"✅ Retrieved stats: {stats['total_chunks']} chunks stored")
+        print("=" * 50)
         return JSONResponse(
             status_code=200,
             content=stats
         )
     except Exception as e:
+        print(f"❌ Error getting stats: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting stats: {str(e)}")
 
 @app.get("/stored-chunks")
 async def get_stored_chunks():
     """Get all stored chunks."""
+    print(f"\n=== API CALL: /stored-chunks ===")
+    print(f"Request received at: {time.strftime('%H:%M:%S')}")
+    print("Retrieving all stored chunks")
+    
     try:
         chunks = vector_store.get_all_chunks()
+        print(f"✅ Retrieved {len(chunks)} chunks from storage")
+        print("=" * 50)
         return JSONResponse(
             status_code=200,
             content={
@@ -130,6 +172,7 @@ async def get_stored_chunks():
             }
         )
     except Exception as e:
+        print(f"❌ Error getting chunks: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting chunks: {str(e)}")
 @app.post("/generate-embeddings", response_model=EmbeddingResponse)
 async def generate_embeddings(input_data: TextInput):
@@ -173,9 +216,10 @@ async def generate_embeddings(input_data: TextInput):
 async def process_text(input_data: TextInput):
     """Process text input and return chunks."""
     try:
-        print(f"Received input: {input_data}")
-        print(f"Text value: '{input_data.text}'")
-        print(f"Text type: {type(input_data.text)}")
+        print(f"\n=== API CALL: /process-text ===")
+        print(f"Request received at: {time.strftime('%H:%M:%S')}")
+        print(f"Text length: {len(input_data.text)} characters")
+        print(f"Text preview: {input_data.text[:100]}...")
         
         # Process the text
         chunks = user_input_service.chunker.chunk_text(input_data.text)
@@ -184,7 +228,9 @@ async def process_text(input_data: TextInput):
         total_words = len(input_data.text.split())
         total_chunks = len(chunks)
         
-        print(f"Processed: {total_words} words, {total_chunks} chunks")
+        print(f"Generated {total_chunks} chunks from {total_words} words")
+        print("✅ Text processing completed successfully")
+        print("=" * 50)
         
         return ChunkResponse(
             total_words=total_words,
@@ -193,12 +239,18 @@ async def process_text(input_data: TextInput):
         )
         
     except Exception as e:
-        print(f"Error in process_text: {str(e)}")
+        print(f"❌ Error in process_text: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error processing text: {str(e)}")
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint to verify server status."""
+    print(f"\n=== API CALL: /health ===")
+    print(f"Request received at: {time.strftime('%H:%M:%S')}")
+    print("Health check requested")
+    print("Server is healthy")
+    print("=" * 50)
+    
     return JSONResponse(
         status_code=200,
         content={
@@ -210,14 +262,12 @@ async def health_check():
 
 @app.post("/rag", response_model=RAGResponse)
 async def rag_query(request: RAGRequest):
-    """Complete RAG pipeline: Search + LLM generation."""
+    """Complete RAG pipeline: Search + LLM generation with professional observability."""
     try:
         # Extract query and parameters from request
         query = request.query
         k = request.k
         max_length = request.max_length
-        
-        print(f"🚀 RAG Query: '{query[:50]}...', k={k}")
         
         # Validate inputs
         if not query.strip():
@@ -226,25 +276,50 @@ async def rag_query(request: RAGRequest):
         if k <= 0:
             raise HTTPException(status_code=400, detail="k must be positive")
         
+        # Initialize performance tracker
+        tracker = PerformanceTracker(f"rag_{int(time.time())}")
+        
         # Step 1: Search for relevant chunks
-        print("🔍 Step 1: Searching for relevant chunks...")
+        tracker.mark_step("search_start")
         search_results = vector_store.search_similar(query, k)
+        tracker.mark_step("search_complete")
         
         if not search_results:
             raise HTTPException(status_code=404, detail="No relevant information found")
         
-        print(f"📚 Found {len(search_results)} relevant chunks")
-        
         # Step 2: Generate LLM response
-        print("🤖 Step 2: Generating LLM response...")
+        tracker.mark_step("llm_start")
         llm_result = llm_service.generate_response(query, search_results, max_length)
+        tracker.mark_step("llm_complete")
         
         if llm_result.get("error"):
             raise HTTPException(status_code=500, detail="Error generating response")
         
-        # Step 3: Return RAG response
-        print("✅ RAG pipeline completed successfully!")
+        # Step 3: Calculate latencies
+        total_latency = tracker.get_total_latency()
+        search_time = tracker.get_step_latency("search_complete") - tracker.get_step_latency("search_start")
+        llm_time = tracker.get_step_latency("llm_complete") - tracker.get_step_latency("llm_start")
+        embedding_time = search_time  # Search includes query embedding
         
+        # Extract distances from search results
+        distances = [result.get("similarity_score", 0) for result in search_results]
+        
+        # Track complete RAG pipeline with enhanced observability
+        observability.track_rag_pipeline(
+            query=query,
+            total_latency_ms=total_latency,
+            embedding_time_ms=embedding_time,
+            search_time_ms=search_time,
+            llm_time_ms=llm_time,
+            success=not llm_result.get("error", False),
+            operation_id=tracker.operation_id,
+            k=k,
+            response_length=len(llm_result.get("response", "")),
+            tokens_used=llm_result.get("tokens_used", 0),
+            distances=distances
+        )
+        
+        # Return RAG response
         return RAGResponse(
             query=llm_result["query"],
             response=llm_result["response"],
@@ -257,19 +332,26 @@ async def rag_query(request: RAGRequest):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ RAG pipeline error: {str(e)}")
+        print(f"RAG pipeline error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"RAG pipeline error: {str(e)}")
 
 @app.get("/llm-stats")
 async def get_llm_stats():
     """Get LLM model statistics."""
+    print(f"\n=== API CALL: /llm-stats ===")
+    print(f"Request received at: {time.strftime('%H:%M:%S')}")
+    print("Getting LLM model statistics")
+    
     try:
         stats = llm_service.get_model_stats()
+        print(f"✅ Retrieved LLM stats for {stats.get('model_name', 'unknown')}")
+        print("=" * 50)
         return JSONResponse(
             status_code=200,
             content=stats
         )
     except Exception as e:
+        print(f"❌ Error getting LLM stats: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting LLM stats: {str(e)}")
 
 @app.post("/search", response_model=SearchResponse)
@@ -310,14 +392,48 @@ async def search_similar_chunks(request: SearchRequest):
 @app.get("/detailed-structure")
 async def get_detailed_structure():
     """Get detailed FAISS storage structure."""
+    print(f"\n=== API CALL: /detailed-structure ===")
+    print(f"Request received at: {time.strftime('%H:%M:%S')}")
+    print("Getting detailed FAISS storage structure")
+    
     try:
         structure = vector_store.get_detailed_structure()
+        print(f"✅ Retrieved detailed structure for {structure.get('index_type', 'unknown')}")
+        print("=" * 50)
         return JSONResponse(
             status_code=200,
             content=structure
         )
     except Exception as e:
+        print(f"❌ Error getting structure: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting structure: {str(e)}")
+
+@app.get("/observability/metrics")
+async def get_observability_metrics():
+    """Get comprehensive observability metrics and performance data."""
+    print(f"\n=== API CALL: /observability/metrics ===")
+    print(f"Request received at: {time.strftime('%H:%M:%S')}")
+    print("Getting observability metrics")
+    
+    try:
+        metrics_summary = observability.get_metrics_summary()
+        print(f"✅ Retrieved observability metrics with {len(metrics_summary)} operations tracked")
+        print("=" * 50)
+        return JSONResponse(
+            status_code=200,
+            content={
+                "metrics_summary": metrics_summary,
+                "system_info": {
+                    "timestamp": time.time(),
+                    "server_uptime": "Running since last restart",
+                    "tracking_enabled": True,
+                    "tracked_operations": list(observability.metrics.keys())
+                }
+            }
+        )
+    except Exception as e:
+        print(f"❌ Error getting metrics: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error getting metrics: {str(e)}")
 
 @app.get("/")
 async def root():
@@ -325,7 +441,7 @@ async def root():
     return JSONResponse(
         status_code=200,
         content={
-            "message": "Welcome to RAG System API",
+            "message": "Welcome to RAG System API with Observability",
             "endpoints": {
                 "health": "/health",
                 "process_text": "/process-text (POST)",
@@ -336,9 +452,18 @@ async def root():
                 "search": "/search (POST)",
                 "rag": "/rag (POST)",
                 "llm_stats": "/llm-stats (GET)",
+                "observability_metrics": "/observability/metrics (GET)",
                 "detailed_structure": "/detailed-structure (GET)",
                 "docs": "/docs"
-            }
+            },
+            "features": [
+                "Real-time embedding generation",
+                "Vector similarity search",
+                "LLM-powered responses",
+                "Comprehensive observability",
+                "Latency tracking",
+                "Anti-hallucination measures"
+            ]
         }
     )
 

@@ -1,6 +1,7 @@
 from typing import List, Dict
 from transformers import pipeline
 import torch
+from src.utils.observability import observability, track_operation, PerformanceTracker
 
 
 class LLMService:
@@ -130,6 +131,7 @@ ANSWER:"""
                 
         return response
     
+    @track_operation("llm_generation")
     def generate_response(self, query: str, search_results: List[Dict], max_length: int = 200) -> Dict:
         """
         Generate response using LLM with retrieved context.
@@ -142,64 +144,78 @@ ANSWER:"""
         Returns:
             Dict: Response with metadata
         """
-        print(f"🤖 Generating response for query: '{query[:50]}...'")
-        print(f"📚 Using {len(search_results)} context chunks")
+        print(f"Generating response for query: '{query[:50]}...'")
+        print(f"Using {len(search_results)} context chunks")
         
-        try:
-            # Format context
-            context = self.format_context(search_results)
-            
-            # Create prompt
-            prompt = self.create_prompt(context, query)
-            
-            print(f"📝 Prompt length: {len(prompt)} characters")
-            
-            # Generate response with anti-hallucination settings
-            response = self.generator(
-                prompt,
-                max_length=max_length,
-                num_return_sequences=1,
-                temperature=0.1,  # Lower temperature for more deterministic responses
-                do_sample=True,
-                pad_token_id=self.generator.tokenizer.eos_token_id,
-                repetition_penalty=1.1,  # Reduce repetition
-                top_k=50,  # Limit token choices
-                top_p=0.9  # Nucleus sampling
-            )
-            
-            generated_text = response[0]['generated_text'].strip()
-            
-            # Validate response for potential hallucinations
-            validated_response = self._validate_response(generated_text, context, query)
-            
-            # Prepare result
-            result = {
-                "query": query,
-                "response": validated_response,
-                "context_used": len(search_results),
-                "context_preview": context[:200] + "..." if len(context) > 200 else context,
-                "model_info": {
-                    "model": "google/flan-t5-base",
-                    "parameters": "770M",
-                    "type": "text-to-text-generation"
-                },
-                "tokens_used": len(generated_text.split()),
-                "response_time": "Fast (local inference)"
-            }
-            
-            print(f"✅ Response generated: {len(generated_text)} characters")
-            print(f"🎯 Response: {generated_text[:100]}...")
-            
-            return result
-            
-        except Exception as e:
-            print(f"❌ Error generating response: {e}")
-            return {
-                "query": query,
-                "response": f"Error generating response: {str(e)}",
-                "context_used": len(search_results),
-                "error": True
-            }
+        with observability.track_latency("llm_generation", {
+            "query_length": len(query),
+            "context_chunks": len(search_results),
+            "max_length": max_length
+        }) as operation_id:
+            try:
+                # Format context
+                context = self.format_context(search_results)
+                
+                # Create prompt
+                prompt = self.create_prompt(context, query)
+                
+                print(f"Prompt length: {len(prompt)} characters")
+                
+                # Generate response with anti-hallucination settings
+                response = self.generator(
+                    prompt,
+                    max_length=max_length,
+                    num_return_sequences=1,
+                    temperature=0.1,  # Lower temperature for more deterministic responses
+                    do_sample=True,
+                    pad_token_id=self.generator.tokenizer.eos_token_id,
+                    repetition_penalty=1.1,  # Reduce repetition
+                    top_k=50,  # Limit token choices
+                    top_p=0.9  # Nucleus sampling
+                )
+                
+                generated_text = response[0]['generated_text'].strip()
+                
+                # Validate response for potential hallucinations
+                validated_response = self._validate_response(generated_text, context, query)
+                
+                # Track LLM metrics
+                observability.track_llm_generation(
+                    query_length=len(query),
+                    context_chunks=len(search_results),
+                    response_length=len(validated_response),
+                    tokens_used=len(generated_text.split()),
+                    operation_id=operation_id
+                )
+                
+                # Prepare result
+                result = {
+                    "query": query,
+                    "response": validated_response,
+                    "context_used": len(search_results),
+                    "context_preview": context[:200] + "..." if len(context) > 200 else context,
+                    "model_info": {
+                        "model": "google/flan-t5-base",
+                        "parameters": "770M",
+                        "type": "text-to-text-generation"
+                    },
+                    "tokens_used": len(generated_text.split()),
+                    "response_time": "Fast (local inference)"
+                }
+                
+                print(f"Response generated: {len(generated_text)} characters")
+                print(f"Response: {generated_text[:100]}...")
+                
+                return result
+                
+            except Exception as e:
+                print(f"Error generating response: {e}")
+                return {
+                    "query": query,
+                    "response": f"Error generating response: {str(e)}",
+                    "context_used": len(search_results),
+                    "error": True
+                }
     
     def get_model_stats(self) -> Dict:
         """Get model and service statistics."""
