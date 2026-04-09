@@ -1,7 +1,8 @@
 from typing import List, Dict, Tuple
 import numpy as np
 import faiss
-from src.services.simple_embedding_service import SimpleEmbeddingService
+from src.services.embedding_service import EmbeddingService
+from src.utils.observability import observability, track_operation
 
 
 class VectorStoreService:
@@ -17,7 +18,7 @@ class VectorStoreService:
         self.dimension = dimension
         self.index = faiss.IndexFlatL2(dimension)  # L2 distance (Euclidean)
         self.stored_chunks: List[str] = []  # Store original chunks
-        self.embedding_service = SimpleEmbeddingService()
+        self.embedding_service = EmbeddingService()
         
         print(f"VectorStoreService initialized:")
         print(f"- Vector dimension: {dimension}")
@@ -25,6 +26,7 @@ class VectorStoreService:
         print(f"- Distance metric: L2 (Euclidean)")
         print(f"- Storage: In-memory (cleared on server restart)")
     
+    @track_operation("embedding_generation")
     def add_chunks(self, chunks: List[str]) -> int:
         """
         Add chunks to vector store.
@@ -37,8 +39,16 @@ class VectorStoreService:
         """
         print(f"Adding {len(chunks)} chunks to vector store...")
         
-        # Generate embeddings for chunks
-        embeddings = self.embedding_service.generate_embeddings(chunks)
+        with observability.track_latency("embedding_generation", {"chunks_count": len(chunks)}) as operation_id:
+            # Generate embeddings for chunks
+            embeddings = self.embedding_service.generate_embeddings(chunks)
+            
+            # Track embedding metrics
+            observability.track_embedding_generation(
+                chunks_count=len(chunks),
+                dimensions=self.dimension,
+                operation_id=operation_id
+            )
         
         # Convert to numpy array
         embedding_array = np.array(embeddings, dtype=np.float32)
@@ -103,28 +113,37 @@ class VectorStoreService:
         """
         print(f"Searching for top {k} similar chunks to query: '{query_text[:50]}...'")
         
-        # Generate embedding for query
-        query_embeddings = self.embedding_service.generate_embeddings([query_text])
-        query_vector = np.array([query_embeddings[0]], dtype=np.float32)
-        
-        # Search in FAISS index
-        distances, indices = self.index.search(query_vector, k)
-        
-        # Prepare results
-        results = []
-        for i, (distance, idx) in enumerate(zip(distances[0], indices[0])):
-            if idx < len(self.stored_chunks):  # Valid index
-                chunk_text = self.stored_chunks[idx]
-                results.append({
-                    "rank": i + 1,
-                    "chunk_id": int(idx),  # Convert numpy.int64 to int
-                    "chunk_text": chunk_text,
-                    "similarity_score": float(distance),  # Convert numpy.float32 to float
-                    "distance_type": "L2 (Euclidean)",
-                    "words": len(chunk_text.split()),
-                    "characters": len(chunk_text),
-                    "lower_is_better": True  # Lower L2 distance = more similar
-                })
+        with observability.track_latency("vector_search", {"query_length": len(query_text), "k": k}) as operation_id:
+            # Generate embedding for query
+            query_embeddings = self.embedding_service.generate_embeddings([query_text])
+            query_vector = np.array([query_embeddings[0]], dtype=np.float32)
+            
+            # Search in FAISS index
+            distances, indices = self.index.search(query_vector, k)
+            
+            # Prepare results
+            results = []
+            for i, (distance, idx) in enumerate(zip(distances[0], indices[0])):
+                if idx < len(self.stored_chunks):  # Valid index
+                    chunk_text = self.stored_chunks[idx]
+                    results.append({
+                        "rank": i + 1,
+                        "chunk_id": int(idx),  # Convert numpy.int64 to int
+                        "chunk_text": chunk_text,
+                        "similarity_score": float(distance),  # Convert numpy.float32 to float
+                        "distance_type": "L2 (Euclidean)",
+                        "words": len(chunk_text.split()),
+                        "characters": len(chunk_text),
+                        "lower_is_better": True  # Lower L2 distance = more similar
+                    })
+            
+            # Track search metrics
+            observability.track_vector_search(
+                query_length=len(query_text),
+                k=k,
+                results_count=len(results),
+                operation_id=operation_id
+            )
         
         print(f"Found {len(results)} similar chunks")
         for result in results:
