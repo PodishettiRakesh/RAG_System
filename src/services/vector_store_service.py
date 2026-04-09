@@ -1,7 +1,7 @@
 from typing import List, Dict, Tuple
 import numpy as np
 import faiss
-from src.services.simple_embedding_service import SimpleEmbeddingService
+from src.services.embedding_service import EmbeddingService
 
 
 class VectorStoreService:
@@ -17,7 +17,7 @@ class VectorStoreService:
         self.dimension = dimension
         self.index = faiss.IndexFlatL2(dimension)  # L2 distance (Euclidean)
         self.stored_chunks: List[str] = []  # Store original chunks
-        self.embedding_service = SimpleEmbeddingService()
+        self.embedding_service = EmbeddingService()
         
         print(f"VectorStoreService initialized:")
         print(f"- Vector dimension: {dimension}")

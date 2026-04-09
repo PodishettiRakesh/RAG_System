@@ -1,49 +1,68 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, Field
 from typing import List
 from src.services.user_input_service import UserInputService
-from src.services.simple_embedding_service import SimpleEmbeddingService
+from src.services.embedding_service import EmbeddingService
 from src.services.vector_store_service import VectorStoreService
 from src.services.llm_service import LLMService
 
 app = FastAPI(title="RAG System API", version="1.0.0")
 
 class TextInput(BaseModel):
-    text: str
+    text: str = Field(..., min_length=10, description="Text to process and store")
+
+class SearchRequest(BaseModel):
+    query: str = Field(..., min_length=1, description="Search query text")
+    k: int = Field(3, ge=1, le=10, description="Number of results to return")
+
+class RAGRequest(BaseModel):
+    query: str = Field(..., min_length=1, description="Query for RAG pipeline")
+    k: int = Field(3, ge=1, le=10, description="Number of context chunks to retrieve")
+    max_length: int = Field(200, ge=50, le=500, description="Maximum response length")
 
 class ChunkResponse(BaseModel):
-    total_words: int
-    total_chunks: int
-    chunks: List[str]
+    total_words: int = Field(..., description="Total number of words in input text")
+    total_chunks: int = Field(..., description="Number of chunks generated")
+    chunks: List[str] = Field(..., description="List of text chunks")
 
 class EmbeddingResponse(BaseModel):
-    total_chunks: int
-    embedding_dimensions: int
-    chunks_with_embeddings: List[dict]
+    total_chunks: int = Field(..., description="Number of chunks processed")
+    embedding_dimensions: int = Field(..., description="Dimensions of each embedding vector")
+    chunks_with_embeddings: List[dict] = Field(..., description="Chunks with their embedding vectors")
 
 class RAGResponse(BaseModel):
-    query: str
-    response: str
-    context_used: int
-    context_preview: str
-    model_info: dict
-    tokens_used: int
+    query: str = Field(..., description="Original user query")
+    response: str = Field(..., description="Generated response from LLM")
+    context_used: int = Field(..., description="Number of context chunks used")
+    context_preview: str = Field(..., description="Preview of context used for generation")
+    model_info: dict = Field(..., description="Information about the LLM model used")
+    tokens_used: int = Field(..., description="Number of tokens in generated response")
+
+class SearchResult(BaseModel):
+    rank: int = Field(..., description="Rank of the result (1 = most similar)")
+    chunk_id: int = Field(..., description="ID of the chunk in storage")
+    chunk_text: str = Field(..., description="Text content of the chunk")
+    similarity_score: float = Field(..., description="Similarity distance score")
+    distance_type: str = Field(..., description="Type of distance metric used")
+    words: int = Field(..., description="Number of words in chunk")
+    characters: int = Field(..., description="Number of characters in chunk")
+    lower_is_better: bool = Field(..., description="Whether lower scores indicate better similarity")
 
 class SearchResponse(BaseModel):
-    query: str
-    k: int
-    total_found: int
-    results: List[dict]
+    query: str = Field(..., description="Search query that was executed")
+    k: int = Field(..., description="Number of results requested")
+    total_found: int = Field(..., description="Total number of results found")
+    results: List[SearchResult] = Field(..., description="List of search results")
 
 class StoreResponse(BaseModel):
-    chunks_added: int
-    total_chunks: int
-    stats: dict
+    chunks_added: int = Field(..., description="Number of chunks added to storage")
+    total_chunks: int = Field(..., description="Total number of chunks in storage after addition")
+    stats: dict = Field(..., description="Storage statistics")
 
 # Initialize services
 user_input_service = UserInputService()
-embedding_service = SimpleEmbeddingService()
+embedding_service = EmbeddingService()
 vector_store = VectorStoreService()
 llm_service = LLMService()
 
@@ -190,13 +209,13 @@ async def health_check():
     )
 
 @app.post("/rag", response_model=RAGResponse)
-async def rag_query(query_data: dict):
+async def rag_query(request: RAGRequest):
     """Complete RAG pipeline: Search + LLM generation."""
     try:
-        # Extract query and k from request
-        query = query_data.get("query", "")
-        k = query_data.get("k", 3)
-        max_length = query_data.get("max_length", 200)
+        # Extract query and parameters from request
+        query = request.query
+        k = request.k
+        max_length = request.max_length
         
         print(f"🚀 RAG Query: '{query[:50]}...', k={k}")
         
@@ -254,12 +273,12 @@ async def get_llm_stats():
         raise HTTPException(status_code=500, detail=f"Error getting LLM stats: {str(e)}")
 
 @app.post("/search", response_model=SearchResponse)
-async def search_similar_chunks(query_data: dict):
+async def search_similar_chunks(request: SearchRequest):
     """Search for similar chunks using query text."""
     try:
-        # Extract query and k from request
-        query = query_data.get("query", "")
-        k = query_data.get("k", 3)
+        # Extract query and parameters from request
+        query = request.query
+        k = request.k
         
         print(f"Search request: query='{query[:50]}...', k={k}")
         
