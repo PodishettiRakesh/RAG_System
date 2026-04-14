@@ -284,8 +284,20 @@ async def rag_query(request: RAGRequest):
         search_results = vector_store.search_similar(query, k)
         tracker.mark_step("search_complete")
         
-        if not search_results:
-            raise HTTPException(status_code=404, detail="No relevant information found")
+        # Step 1.5: Filter chunks by similarity threshold
+        similarity_threshold = 1.5  # Lower is better for L2 distance
+        filtered_results = []
+        for result in search_results:
+            similarity_score = result.get("similarity_score", float('inf'))
+            if similarity_score <= similarity_threshold:
+                filtered_results.append(result)
+        
+        print(f"🔍 Similarity filtering: {len(search_results)} → {len(filtered_results)} chunks (threshold: {similarity_threshold})")
+        
+        if not filtered_results:
+            raise HTTPException(status_code=404, detail="No relevant information found in stored chunks")
+        
+        search_results = filtered_results
         
         # Step 2: Generate LLM response
         tracker.mark_step("llm_start")
