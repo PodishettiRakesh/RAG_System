@@ -49,7 +49,7 @@ class ServerEvaluationService:
             }
         
         answer = server_response.get("response", "")
-        retrieved_chunks = [server_response.get("context_preview", "")]
+        retrieved_chunks = server_response.get("retrieved_chunks", [])
         response_time = time.time() - start_time
         
         # Check if response indicates no relevant chunks found
@@ -100,8 +100,14 @@ class ServerEvaluationService:
         # Simple precision calculation (can be improved)
         relevant_chunks = 0
         for chunk in retrieved_chunks:
+            # Extract text from chunk dictionaries
+            if isinstance(chunk, dict):
+                chunk_text = chunk.get("chunk_text", "")
+            else:
+                chunk_text = str(chunk)
+            
             # Check if chunk contains relevant keywords
-            if any(word.lower() in chunk.lower() for word in expected_answer.split()[:3]):
+            if any(word.lower() in chunk_text.lower() for word in expected_answer.split()[:3]):
                 relevant_chunks += 1
         
         precision_at_k = relevant_chunks / len(retrieved_chunks)
@@ -143,9 +149,15 @@ class ServerEvaluationService:
         answer_words = set(answer.lower().split())
         chunk_words = set()
         
+        # Extract text from chunk dictionaries
         for chunk in retrieved_chunks:
-            if chunk:  # Only add words from non-empty chunks
-                chunk_words.update(chunk.lower().split())
+            if isinstance(chunk, dict):
+                chunk_text = chunk.get("chunk_text", "")
+            else:
+                chunk_text = str(chunk)
+            
+            if chunk_text:  # Only add words from non-empty chunks
+                chunk_words.update(chunk_text.lower().split())
         
         # Debug logging
         print(f"DEBUG: Answer words: {answer_words}")

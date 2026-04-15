@@ -40,6 +40,7 @@ class RAGResponse(BaseModel):
     context_preview: str = Field(..., description="Preview of context used for generation")
     model_info: dict = Field(..., description="Information about the LLM model used")
     tokens_used: int = Field(..., description="Number of tokens in generated response")
+    retrieved_chunks: List[dict] = Field(..., description="Full retrieved chunks for evaluation")
 
 class SearchResult(BaseModel):
     rank: int = Field(..., description="Rank of the result (1 = most similar)")
@@ -338,7 +339,8 @@ async def rag_query(request: RAGRequest):
             context_used=llm_result["context_used"],
             context_preview=llm_result["context_preview"],
             model_info=llm_result["model_info"],
-            tokens_used=llm_result["tokens_used"]
+            tokens_used=llm_result["tokens_used"],
+            retrieved_chunks=search_results  # Add full retrieved chunks
         )
         
     except HTTPException:
