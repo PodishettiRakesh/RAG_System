@@ -19,6 +19,26 @@
                 "hidden": false,
                 "group": "RAG System"
             }
+        },
+        {
+            "name": "Debug Evaluation",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/test_evaluation_complete.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "python": "${workspaceFolder}/venv/Scripts/python.exe",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "args": [],
+            "justMyCode": true,
+            "stopOnEntry": false,
+            "presentation": {
+                "hidden": false,
+                "group": "RAG System"
+            }
         }
+
     ]
 }
