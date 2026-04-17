@@ -159,24 +159,20 @@ class ServerEvaluationService:
             if chunk_text:  # Only add words from non-empty chunks
                 chunk_words.update(chunk_text.lower().split())
         
-        # Debug logging
-        print(f"DEBUG: Answer words: {answer_words}")
-        print(f"DEBUG: Chunk words: {chunk_words}")
-        print(f"DEBUG: Retrieved chunks: {retrieved_chunks}")
+        # Debug logging (disabled for clean output)
+        DEBUG = False
+        if DEBUG:
+            print(f"DEBUG: Answer words: {answer_words}")
+            print(f"DEBUG: Chunk words: {chunk_words}")
+            print(f"DEBUG: Retrieved chunks: {retrieved_chunks}")
         
         # If more than 70% of answer words are not in chunks, flag as hallucination
         novel_words = answer_words - chunk_words
         content_overlap = len(answer_words & chunk_words) / len(answer_words) if answer_words else 0
         
-        print(f"DEBUG: Novel words: {novel_words}")
-        print(f"DEBUG: Content overlap: {content_overlap:.2f}")
-        print(f"DEBUG: Novel words ratio: {len(novel_words)}/{len(answer_words)} = {len(novel_words)/len(answer_words) if answer_words else 0}")
-        
         hallucination_detected = len(novel_words) > len(answer_words) * 0.7
         if content_overlap >= 0.3:  # At least 30% overlap
             hallucination_detected = False
-        
-        print(f"DEBUG: Hallucination detected: {hallucination_detected}")
         
         return {"hallucination_detected": hallucination_detected}
     

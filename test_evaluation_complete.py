@@ -153,12 +153,14 @@ def run_evaluation():
         
         # Print aggregate metrics
         print("\n" + "=" * 60)
-        print("📈 AGGREGATE METRICS")
+        print("📊 EVALUATION SUMMARY")
         print("=" * 60)
-        print(format_aggregate_metrics(
-            results['aggregate_metrics'], 
-            results['total_queries']
-        ))
+        
+        metrics = results['aggregate_metrics']
+        print(f"- Precision@K: {metrics['avg_precision_at_k']:.2f}")
+        print(f"- Hit Rate: {'✅' if metrics['hit_rate_percentage'] > 0 else '❌'}")
+        print(f"- Hallucination: {'❌' if metrics['hallucination_rate_percentage'] > 0 else '✅'}")
+        print(f"- Final Score: {metrics['avg_overall_score']:.0f}/10")
         
         # Print interview talking points
         print("\n" + "=" * 60)

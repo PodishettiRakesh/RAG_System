@@ -49,7 +49,7 @@ class ObservabilityTracker:
         # Store in metrics
         if event_type in self.metrics:
             self.metrics[event_type].append(log_entry)
-            print(f"🔍 DEBUG: Stored {event_type} event. Total {event_type} events: {len(self.metrics[event_type])}")
+            # print(f"🔍 DEBUG: Stored {event_type} event. Total {event_type} events: {len(self.metrics[event_type])}")
         else:
             print(f"⚠️ DEBUG: Unknown event_type: {event_type}")
     
@@ -121,7 +121,7 @@ class ObservabilityTracker:
                           embedding_time_ms: float, search_time_ms: float, 
                           llm_time_ms: float, success: bool, operation_id: str,
                           k: int = 3, response_length: int = 0, tokens_used: int = 0,
-                          distances: list = None):
+                          distances: list = None, response_text: str = ""):
         """Track complete RAG pipeline metrics."""
         print(f"🔍 DEBUG: track_rag_pipeline called with query: {query[:50]}...")
         
@@ -159,11 +159,12 @@ class ObservabilityTracker:
                 "search_percentage": search_pct,
                 "llm_percentage": llm_pct
             },
-            "bottleneck": bottleneck
+            "bottleneck": bottleneck,
+            "response_text": response_text
         })
         
         # Print clean summary
-        self._print_rag_summary(
+        self.print_rag_pipeline_summary(
             query=query,
             k=k,
             retrieved_chunks=len(distances) if distances else 0,
@@ -177,21 +178,30 @@ class ObservabilityTracker:
             embedding_pct=embedding_pct,
             search_pct=search_pct,
             llm_pct=llm_pct,
-            bottleneck=bottleneck
+            bottleneck=bottleneck,
+            response_text=response_text
         )
     
-    def _print_rag_summary(self, query: str, k: int, retrieved_chunks: int, 
-                          distances: list, response_length: int, tokens_used: int,
+    def print_rag_pipeline_summary(self, query: str, k: int, retrieved_chunks: int, 
+                          response_length: int, tokens_used: int, distances: list,
                           embedding_time_ms: float, search_time_ms: float, 
                           llm_time_ms: float, total_latency_ms: float,
                           embedding_pct: float, search_pct: float, llm_pct: float,
-                          bottleneck: str):
+                          bottleneck: str, response_text: str = ""):
         """Print clean, human-readable RAG pipeline summary."""
         print(f"\n{'='*60}")
         print(f"{'='*20} RAG PIPELINE SUMMARY {'='*20}")
         print(f"{'='*60}")
-        print(f"Query: \"{query[:50]}{'...' if len(query) > 50 else ''}\"")
+        print(f"Query: \"{query}\"")
         print(f"Top-K: {k}")
+        
+        # Add Response section if response text is provided
+        if response_text:
+            print(f"\n{'='*25} Response {'='*25}")
+            preview = response_text[:75] + "..." if len(response_text) > 50 else response_text
+            print(f"- Answer (preview): {preview}")
+            print(f"- Length: {response_length} chars")
+        
         print(f"\n{'='*25} Retrieval {'='*25}")
         print(f"- Chunks Retrieved: {retrieved_chunks}")
         if distances:
