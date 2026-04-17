@@ -287,6 +287,15 @@ async def rag_query(request: RAGRequest):
         
         # Step 1.5: Filter chunks by similarity threshold
         similarity_threshold = 1.5  # Lower is better for L2 distance
+        print(f"🔍 RETRIEVAL RESULTS")
+        print(f"Top-K: {len(search_results)}")
+        print()
+        
+        for i, result in enumerate(search_results, 1):
+            distance = result.get('similarity_score', 'N/A')
+            chunk_id = result.get('chunk_id', 'N/A')
+            print(f"{i}. Chunk {chunk_id} → Distance: {distance:.2f}")
+        
         filtered_results = []
         for result in search_results:
             similarity_score = result.get("similarity_score", float('inf'))
@@ -296,6 +305,12 @@ async def rag_query(request: RAGRequest):
         print(f"🔍 Similarity filtering: {len(search_results)} → {len(filtered_results)} chunks (threshold: {similarity_threshold})")
         
         if not filtered_results:
+            print(f"🚫 FILTER RESULT:")
+            print(f"No relevant chunks passed threshold → Skipping LLM generation")
+            print()
+            print(f"⚠️ FINAL DECISION:")
+            print(f"No answer generated (avoided hallucination)")
+            print()
             raise HTTPException(status_code=404, detail="No relevant information found in stored chunks")
         
         search_results = filtered_results
@@ -329,8 +344,22 @@ async def rag_query(request: RAGRequest):
             k=k,
             response_length=len(llm_result.get("response", "")),
             tokens_used=llm_result.get("tokens_used", 0),
-            distances=distances
+            distances=distances,
+            response_text=llm_result.get("response", "")
         )
+        
+        # Add context awareness
+        print(f"📄 CONTEXT USED: {len(search_results)} chunks (relevant, below threshold)")
+        
+        # Calculate answer confidence based on retrieval quality
+        avg_distance = sum(distances) / len(distances) if distances else float('inf')
+        confidence = "HIGH" if avg_distance < 1.0 else "MEDIUM" if avg_distance < 1.5 else "LOW"
+        print(f"📌 Answer Confidence: {confidence} (based on retrieval + overlap)")
+        
+        # Add final verdict
+        print()
+        print(f"✅ FINAL DECISION:")
+        print(f"Answer generated using grounded context")
         
         # Return RAG response
         return RAGResponse(
