@@ -123,7 +123,7 @@ async def store_chunks(input_data: TextInput):
         
         print(f"✅ Successfully stored {chunks_added} chunks")
         print(f"Total chunks in storage: {stats['total_chunks']}")
-        print("=" * 50)
+        print("-" * 50)
         
         return StoreResponse(
             chunks_added=chunks_added,
@@ -145,7 +145,7 @@ async def get_store_stats():
     try:
         stats = vector_store.get_stats()
         print(f"✅ Retrieved stats: {stats['total_chunks']} chunks stored")
-        print("=" * 50)
+        print("-" * 50)
         return JSONResponse(
             status_code=200,
             content=stats
@@ -164,7 +164,7 @@ async def get_stored_chunks():
     try:
         chunks = vector_store.get_all_chunks()
         print(f"✅ Retrieved {len(chunks)} chunks from storage")
-        print("=" * 50)
+        print("-" * 50)
         return JSONResponse(
             status_code=200,
             content={
@@ -231,7 +231,7 @@ async def process_text(input_data: TextInput):
         
         print(f"Generated {total_chunks} chunks from {total_words} words")
         print("✅ Text processing completed successfully")
-        print("=" * 50)
+        print("-" * 50)
         
         return ChunkResponse(
             total_words=total_words,
@@ -250,7 +250,7 @@ async def health_check():
     print(f"Request received at: {time.strftime('%H:%M:%S')}")
     print("Health check requested")
     print("Server is healthy")
-    print("=" * 50)
+    print("-" * 50)
     
     return JSONResponse(
         status_code=200,
@@ -306,8 +306,8 @@ async def rag_query(request: RAGRequest):
         
         if not filtered_results:
             print(f"🚫 FILTER RESULT:")
-            print(f"No relevant chunks passed threshold → Skipping LLM generation")
-            print()
+            print(f"❌ No context → No answer (prevent hallucination)")
+            print("\n")
             print(f"⚠️ FINAL DECISION:")
             print(f"No answer generated (avoided hallucination)")
             print()
@@ -353,8 +353,9 @@ async def rag_query(request: RAGRequest):
         
         # Calculate answer confidence based on retrieval quality
         avg_distance = sum(distances) / len(distances) if distances else float('inf')
-        confidence = "HIGH" if avg_distance < 1.0 else "MEDIUM" if avg_distance < 1.5 else "LOW"
-        print(f"📌 Answer Confidence: {confidence} (based on retrieval + overlap)")
+        confidence_score = max(0.0, min(1.0, 1.0 - (avg_distance / 2.0)))  # Normalize to 0-1
+        confidence_label = "HIGH" if confidence_score > 0.7 else "MEDIUM" if confidence_score > 0.4 else "LOW"
+        print(f"Confidence Score: {confidence_label} ({confidence_score:.1f})")
         
         # Add final verdict
         print()
@@ -388,7 +389,7 @@ async def get_llm_stats():
     try:
         stats = llm_service.get_model_stats()
         print(f"✅ Retrieved LLM stats for {stats.get('model_name', 'unknown')}")
-        print("=" * 50)
+        print("-" * 50)
         return JSONResponse(
             status_code=200,
             content=stats
@@ -442,7 +443,7 @@ async def get_detailed_structure():
     try:
         structure = vector_store.get_detailed_structure()
         print(f"✅ Retrieved detailed structure for {structure.get('index_type', 'unknown')}")
-        print("=" * 50)
+        print("-" * 50)
         return JSONResponse(
             status_code=200,
             content=structure
@@ -461,7 +462,7 @@ async def get_observability_metrics():
     try:
         metrics_summary = observability.get_metrics_summary()
         print(f"✅ Retrieved observability metrics with {len(metrics_summary)} operations tracked")
-        print("=" * 50)
+        print("-" * 50)
         return JSONResponse(
             status_code=200,
             content={
