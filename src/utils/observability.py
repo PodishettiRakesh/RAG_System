@@ -60,10 +60,10 @@ class ObservabilityTracker:
         operation_id = f"{operation}_{int(start_time * 1000)}"
         
         # Log operation start
-        self.log_structured(f"{operation}_start", {
-            "operation_id": operation_id,
-            "metadata": metadata or {}
-        })
+        # self.log_structured(f"{operation}_start", {
+        #     "operation_id": operation_id,
+        #     "metadata": metadata or {}
+        # })
         
         try:
             yield operation_id
@@ -97,25 +97,25 @@ class ObservabilityTracker:
     
     def track_vector_search(self, query_length: int, k: int, results_count: int, operation_id: str):
         """Track vector search metrics."""
-        self.log_structured("vector_search", {
-            "operation_id": operation_id,
-            "query_length": query_length,
-            "k_requested": k,
-            "results_count": results_count,
-            "success_rate": results_count / k if k > 0 else 0
-        })
+        # self.log_structured("vector_search", {
+        #     "operation_id": operation_id,
+        #     "query_length": query_length,
+        #     "k_requested": k,
+        #     "results_count": results_count,
+        #     "success_rate": results_count / k if k > 0 else 0
+        # })
     
     def track_llm_generation(self, query_length: int, context_chunks: int, 
                            response_length: int, tokens_used: int, operation_id: str):
         """Track LLM generation metrics."""
-        self.log_structured("llm_generation", {
-            "operation_id": operation_id,
-            "query_length": query_length,
-            "context_chunks": context_chunks,
-            "response_length": response_length,
-            "tokens_used": tokens_used,
-            "tokens_per_second": tokens_used / 0.1 if operation_id else 0  # Approximate
-        })
+        # self.log_structured("llm_generation", {
+        #     "operation_id": operation_id,
+        #     "query_length": query_length,
+        #     "context_chunks": context_chunks,
+        #     "response_length": response_length,
+        #     "tokens_used": tokens_used,
+        #     "tokens_per_second": tokens_used / 0.1 if operation_id else 0  # Approximate
+        # })
     
     def track_rag_pipeline(self, query: str, total_latency_ms: float, 
                           embedding_time_ms: float, search_time_ms: float, 
@@ -216,8 +216,20 @@ class ObservabilityTracker:
         print(f"- Total: {total_latency_ms} ms")
         print(f"\n{'='*25} Performance Insight {'='*25}")
         print(f"- Bottleneck: {bottleneck} ({max(embedding_pct, search_pct, llm_pct)}% time)")
-        print(f"- Retrieval Efficiency: {'Good' if search_time_ms < 100 else 'Needs optimization'}")
-        print(f"{'='*60}\n")
+        avg_distance = sum(distances) / len(distances) if distances else 0
+
+        if avg_distance < 1.0:
+            quality = "High"
+            distance_info = ""
+        elif avg_distance < 1.5:
+            quality = "Moderate"
+            distance_info = " (distance > 1.0 for some chunks)"
+        else:
+            quality = "Low"
+            distance_info = " (poor semantic match)"
+            
+        print(f"- Retrieval Quality: {quality} (avg distance: {avg_distance:.2f}){distance_info}")
+        print(f"{'-'*60}\n")
     
     def get_metrics_summary(self) -> Dict[str, Any]:
         """Get summary of all tracked metrics."""

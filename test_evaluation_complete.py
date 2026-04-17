@@ -54,6 +54,7 @@ Generation:
 - Exact Match: {'✅' if generation['exact_match'] > 0 else '❌'}
 - Keyword Score: {generation['keyword_score']:.2f}
 - Answer Length: {generation['answer_length']} chars
+- Answer (preview): {result.get('answer', '')[:50]}{'...' if len(result.get('answer', '')) > 50 else ''}
 
 Hallucination:
 - {'❌' if hallucination['hallucination_detected'] else '✅'} {'Hallucination detected' if hallucination['hallucination_detected'] else 'No hallucination detected'}
@@ -99,7 +100,7 @@ def check_existing_server():
 def run_evaluation():
     """Run the complete evaluation pipeline."""
     print("🚀 Starting RAG System Evaluation...")
-    print("=" * 60)
+    print("-" * 60)
     
     # Check for existing server with data first
     existing_chunks = check_existing_server()
@@ -143,18 +144,18 @@ def run_evaluation():
         results = evaluation_service.evaluate_dataset(str(dataset_path), k=3)
         
         # Print individual results
-        print("\n" + "=" * 60)
+        print("\n" + "-" * 60)
         print("📋 INDIVIDUAL QUERY RESULTS")
-        print("=" * 60)
+        print("-" * 60)
         
         for i, result in enumerate(results['individual_results'], 1):
             print(f"\n--- Query {i} ---")
             print(format_single_result(result))
         
         # Print aggregate metrics
-        print("\n" + "=" * 60)
+        print("\n" + "-" * 60)
         print("📊 EVALUATION SUMMARY")
-        print("=" * 60)
+        print("-" * 60)
         
         metrics = results['aggregate_metrics']
         print(f"- Precision@K: {metrics['avg_precision_at_k']:.2f}")
@@ -163,9 +164,9 @@ def run_evaluation():
         print(f"- Final Score: {metrics['avg_overall_score']:.0f}/10")
         
         # Print interview talking points
-        print("\n" + "=" * 60)
+        print("\n" + "-" * 60)
         print("🎯 INTERVIEW TALKING POINTS")
-        print("=" * 60)
+        print("-" * 60)
         
         metrics = results['aggregate_metrics']
         talking_points = [
@@ -181,9 +182,9 @@ def run_evaluation():
         print(f"\n✅ Evaluation completed in {results['total_evaluation_time']:.2f} seconds")
         
         # Success criteria check
-        print("\n" + "=" * 60)
+        print("\n" + "-" * 60)
         print("✅ SUCCESS CRITERIA CHECK")
-        print("=" * 60)
+        print("-" * 60)
         
         success_criteria = [
             ("✅ Evaluation dataset with 10+ domain-specific Q&A pairs", len(results['individual_results']) >= 10),
