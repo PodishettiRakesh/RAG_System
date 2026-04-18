@@ -281,10 +281,19 @@ RAG_System/
 
 ---
 
-
 ## 📬 Let's Connect
 
 Open to discussions on:
 - RAG systems
 - LLM evaluation
 - GenAI system design
+
+---
+
+## Documentation
+
+For complete technical documentation, API reference, and usage examples:
+
+**[View Help Documentation](./HELP.md)**
+
+---
