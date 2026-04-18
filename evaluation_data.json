@@ -1,0 +1,74 @@
+[
+  {
+    "question": "Why is Iran considered strategically significant in the Middle East?",
+    "ground_truth": "Iran is strategically significant due to its vast oil and natural gas reserves, geopolitical influence, and historical legacy",
+    "expected_keywords": ["Iran", "strategic", "energy resources", "oil", "natural gas", "geopolitical influence"],
+    "relevant_chunk_ids": [0]
+  },
+  {
+    "question": "What makes Iran important in global energy markets?",
+    "ground_truth": "Iran has one of the largest proven reserves of oil and natural gas and is a key member of OPEC",
+    "expected_keywords": ["oil", "natural gas", "reserves", "OPEC", "energy markets"],
+    "relevant_chunk_ids": [0, 1]
+  },
+  {
+    "question": "How is Iran's political system structured?",
+    "ground_truth": "Iran has a hybrid system combining elected institutions with religious leadership under the Supreme Leader",
+    "expected_keywords": ["political system", "elected", "parliament", "Supreme Leader", "theocratic", "democratic"],
+    "relevant_chunk_ids": [1]
+  },
+  {
+    "question": "How does Iran exert influence in the Middle East?",
+    "ground_truth": "Iran exerts influence through alliances and proxy groups in countries like Iraq, Syria, and Lebanon",
+    "expected_keywords": ["influence", "alliances", "proxy groups", "Iraq", "Syria", "Lebanon"],
+    "relevant_chunk_ids": [2]
+  },
+  {
+    "question": "Why is the Strait of Hormuz strategically important?",
+    "ground_truth": "It is a critical chokepoint through which a large portion of the world's oil supply passes",
+    "expected_keywords": ["Strait of Hormuz", "chokepoint", "oil", "global supply", "maritime"],
+    "relevant_chunk_ids": [3, 5]
+  },
+  {
+    "question": "What are the main characteristics of the United States as a global power?",
+    "ground_truth": "The United States is a global superpower with strong economic, military, and technological capabilities",
+    "expected_keywords": ["United States", "global power", "economic", "military", "technological"],
+    "relevant_chunk_ids": [3]
+  },
+  {
+    "question": "How has the relationship between the United States and Iran evolved since 1979?",
+    "ground_truth": "The relationship has been adversarial, involving sanctions, diplomatic tensions, and agreements like the JCPOA",
+    "expected_keywords": ["1979", "sanctions", "tensions", "JCPOA", "nuclear deal"],
+    "relevant_chunk_ids": [3, 4]
+  },
+  {
+    "question": "What role does the United States play in maintaining maritime security?",
+    "ground_truth": "The United States maintains naval forces to ensure freedom of navigation and protect shipping lanes",
+    "expected_keywords": ["naval", "freedom of navigation", "shipping lanes", "security"],
+    "relevant_chunk_ids": [4]
+  },
+  {
+    "question": "What risks are associated with disruptions in the Strait of Hormuz?",
+    "ground_truth": "Disruptions can lead to spikes in global oil prices and economic instability",
+    "expected_keywords": ["disruptions", "oil prices", "economic instability", "tensions", "blockades"],
+    "relevant_chunk_ids": [6]
+  },
+  {
+    "question": "How can Iran leverage its position near the Strait of Hormuz?",
+    "ground_truth": "Iran can exert control or influence over the strait during periods of geopolitical tension",
+    "expected_keywords": ["Iran", "control", "influence", "Strait of Hormuz", "tension"],
+    "relevant_chunk_ids": [6, 7]
+  },
+  {
+    "question": "What are the global consequences of rising tensions between Iran and the United States?",
+    "ground_truth": "Rising tensions can impact global markets, energy security, and international relations",
+    "expected_keywords": ["tensions", "global markets", "energy security", "international relations"],
+    "relevant_chunk_ids": [7, 8]
+  },
+  {
+    "question": "What future factors may influence the strategic importance of this region?",
+    "ground_truth": "Factors include changing energy demand, alternative energy sources, and evolving geopolitical alliances",
+    "expected_keywords": ["energy demand", "alternative energy", "alliances", "future", "geopolitics"],
+    "relevant_chunk_ids": [8]
+  }
+]
