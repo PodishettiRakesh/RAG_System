@@ -189,32 +189,32 @@ class ObservabilityTracker:
                           embedding_pct: float, search_pct: float, llm_pct: float,
                           bottleneck: str, response_text: str = ""):
         """Print clean, human-readable RAG pipeline summary."""
-        print(f"\n{'='*60}")
-        print(f"{'='*20} RAG PIPELINE SUMMARY {'='*20}")
-        print(f"{'='*60}")
+        print(f"\n{'-'*60}")
+        print(f"{'-'*20} RAG PIPELINE SUMMARY {'-'*20}")
+        print(f"{'-'*60}")
         print(f"Query: \"{query}\"")
         print(f"Top-K: {k}")
         
         # Add Response section if response text is provided
         if response_text:
-            print(f"\n{'='*25} Response {'='*25}")
+            print(f"\n{'-'*25} Response {'-'*25}")
             preview = response_text[:75] + "..." if len(response_text) > 50 else response_text
             print(f"- Answer (preview): {preview}")
             print(f"- Length: {response_length} chars")
         
-        print(f"\n{'='*25} Retrieval {'='*25}")
+        print(f"\n{'-'*25} Retrieval {'-'*25}")
         print(f"- Chunks Retrieved: {retrieved_chunks}")
         if distances:
             print(f"- Distances: [{', '.join([f'{d:.2f}' for d in distances[:3]])}{'...' if len(distances) > 3 else ''}]")
-        print(f"\n{'='*25} LLM {'='*25}")
+        print(f"\n{'-'*25} LLM {'-'*25}")
         print(f"- Response Length: {response_length} chars")
         print(f"- Tokens Used: {tokens_used}")
-        print(f"\n{'='*25} Latency Breakdown {'='*25}")
+        print(f"\n{'-'*25} Latency Breakdown {'-'*25}")
         print(f"- Embedding: {embedding_time_ms} ms ({embedding_pct}%)")
         print(f"- Retrieval: {search_time_ms} ms ({search_pct}%)")
         print(f"- LLM: {llm_time_ms} ms ({llm_pct}%)")
         print(f"- Total: {total_latency_ms} ms")
-        print(f"\n{'='*25} Performance Insight {'='*25}")
+        print(f"\n{'-'*25} Performance Insight {'-'*25}")
         print(f"- Bottleneck: {bottleneck} ({max(embedding_pct, search_pct, llm_pct)}% time)")
         avg_distance = sum(distances) / len(distances) if distances else 0
 
