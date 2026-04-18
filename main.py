@@ -40,6 +40,7 @@ class RAGResponse(BaseModel):
     context_preview: str = Field(..., description="Preview of context used for generation")
     model_info: dict = Field(..., description="Information about the LLM model used")
     tokens_used: int = Field(..., description="Number of tokens in generated response")
+    retrieved_chunks: List[dict] = Field(..., description="Full retrieved chunks for evaluation")
 
 class SearchResult(BaseModel):
     rank: int = Field(..., description="Rank of the result (1 = most similar)")
@@ -122,7 +123,7 @@ async def store_chunks(input_data: TextInput):
         
         print(f"✅ Successfully stored {chunks_added} chunks")
         print(f"Total chunks in storage: {stats['total_chunks']}")
-        print("=" * 50)
+        print("-" * 50)
         
         return StoreResponse(
             chunks_added=chunks_added,
@@ -144,7 +145,7 @@ async def get_store_stats():
     try:
         stats = vector_store.get_stats()
         print(f"✅ Retrieved stats: {stats['total_chunks']} chunks stored")
-        print("=" * 50)
+        print("-" * 50)
         return JSONResponse(
             status_code=200,
             content=stats
@@ -163,7 +164,7 @@ async def get_stored_chunks():
     try:
         chunks = vector_store.get_all_chunks()
         print(f"✅ Retrieved {len(chunks)} chunks from storage")
-        print("=" * 50)
+        print("-" * 50)
         return JSONResponse(
             status_code=200,
             content={
@@ -230,7 +231,7 @@ async def process_text(input_data: TextInput):
         
         print(f"Generated {total_chunks} chunks from {total_words} words")
         print("✅ Text processing completed successfully")
-        print("=" * 50)
+        print("-" * 50)
         
         return ChunkResponse(
             total_words=total_words,
@@ -249,7 +250,7 @@ async def health_check():
     print(f"Request received at: {time.strftime('%H:%M:%S')}")
     print("Health check requested")
     print("Server is healthy")
-    print("=" * 50)
+    print("-" * 50)
     
     return JSONResponse(
         status_code=200,
@@ -284,8 +285,35 @@ async def rag_query(request: RAGRequest):
         search_results = vector_store.search_similar(query, k)
         tracker.mark_step("search_complete")
         
-        if not search_results:
-            raise HTTPException(status_code=404, detail="No relevant information found")
+        # Step 1.5: Filter chunks by similarity threshold
+        similarity_threshold = 1.5  # Lower is better for L2 distance
+        print(f"🔍 RETRIEVAL RESULTS")
+        print(f"Top-K: {len(search_results)}")
+        print()
+        
+        for i, result in enumerate(search_results, 1):
+            distance = result.get('similarity_score', 'N/A')
+            chunk_id = result.get('chunk_id', 'N/A')
+            print(f"{i}. Chunk {chunk_id} → Distance: {distance:.2f}")
+        
+        filtered_results = []
+        for result in search_results:
+            similarity_score = result.get("similarity_score", float('inf'))
+            if similarity_score <= similarity_threshold:
+                filtered_results.append(result)
+        
+        print(f"🔍 Similarity filtering: {len(search_results)} → {len(filtered_results)} chunks (threshold: {similarity_threshold})")
+        
+        if not filtered_results:
+            print(f"🚫 FILTER RESULT:")
+            print(f"❌ No context → No answer (prevent hallucination)")
+            print("\n")
+            print(f"⚠️ FINAL DECISION:")
+            print(f"No answer generated (avoided hallucination)")
+            print()
+            raise HTTPException(status_code=404, detail="No relevant information found in stored chunks")
+        
+        search_results = filtered_results
         
         # Step 2: Generate LLM response
         tracker.mark_step("llm_start")
@@ -316,8 +344,23 @@ async def rag_query(request: RAGRequest):
             k=k,
             response_length=len(llm_result.get("response", "")),
             tokens_used=llm_result.get("tokens_used", 0),
-            distances=distances
+            distances=distances,
+            response_text=llm_result.get("response", "")
         )
+        
+        # Add context awareness
+        print(f"📄 CONTEXT USED: {len(search_results)} chunks (relevant, below threshold)")
+        
+        # Calculate answer confidence based on retrieval quality
+        avg_distance = sum(distances) / len(distances) if distances else float('inf')
+        confidence_score = max(0.0, min(1.0, 1.0 - (avg_distance / 2.0)))  # Normalize to 0-1
+        confidence_label = "HIGH" if confidence_score > 0.7 else "MEDIUM" if confidence_score > 0.4 else "LOW"
+        print(f"Confidence Score: {confidence_label} ({confidence_score:.1f})")
+        
+        # Add final verdict
+        print()
+        print(f"✅ FINAL DECISION:")
+        print(f"Answer generated using grounded context")
         
         # Return RAG response
         return RAGResponse(
@@ -326,7 +369,8 @@ async def rag_query(request: RAGRequest):
             context_used=llm_result["context_used"],
             context_preview=llm_result["context_preview"],
             model_info=llm_result["model_info"],
-            tokens_used=llm_result["tokens_used"]
+            tokens_used=llm_result["tokens_used"],
+            retrieved_chunks=search_results  # Add full retrieved chunks
         )
         
     except HTTPException:
@@ -345,7 +389,7 @@ async def get_llm_stats():
     try:
         stats = llm_service.get_model_stats()
         print(f"✅ Retrieved LLM stats for {stats.get('model_name', 'unknown')}")
-        print("=" * 50)
+        print("-" * 50)
         return JSONResponse(
             status_code=200,
             content=stats
@@ -399,7 +443,7 @@ async def get_detailed_structure():
     try:
         structure = vector_store.get_detailed_structure()
         print(f"✅ Retrieved detailed structure for {structure.get('index_type', 'unknown')}")
-        print("=" * 50)
+        print("-" * 50)
         return JSONResponse(
             status_code=200,
             content=structure
@@ -418,7 +462,7 @@ async def get_observability_metrics():
     try:
         metrics_summary = observability.get_metrics_summary()
         print(f"✅ Retrieved observability metrics with {len(metrics_summary)} operations tracked")
-        print("=" * 50)
+        print("-" * 50)
         return JSONResponse(
             status_code=200,
             content={
