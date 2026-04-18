@@ -112,7 +112,16 @@ class ServerEvaluationService:
         
         precision_at_k = relevant_chunks / len(retrieved_chunks)
         hit_rate = 1 if relevant_chunks > 0 else 0
-        avg_distance = 0.5  # Placeholder - would need actual distances from server
+        
+        # Calculate actual average distance from retrieved chunks
+        distances = []
+        for chunk in retrieved_chunks:
+            if isinstance(chunk, dict):
+                similarity_score = chunk.get("similarity_score", 0)
+                if similarity_score is not None:
+                    distances.append(similarity_score)
+        
+        avg_distance = sum(distances) / len(distances) if distances else 0
         
         return {
             "precision_at_k": precision_at_k,

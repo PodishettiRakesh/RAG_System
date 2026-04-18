@@ -26,11 +26,11 @@ This system explicitly addresses these gaps through evaluation and observability
 ## 📸 System Demo
 
 ### 🔍 RAG Pipeline Execution
-![RAG Pipeline](./assets/Screenshot%202026-04-17%20131202.png)
+![RAG Pipeline](./assets/rag.png)
 
 
 ### 📊 Evaluation Metrics Output
-![Evaluation](./assets/evaluation.png)
+![Evaluation](./assets/rag_eval.png)
 
 ### ⚡ API + Logs (Observability)
 ![Logs](./assets/logs.png)
@@ -54,7 +54,7 @@ This system solves that by:
 
 ## 🏗️ System Architecture
 
-![Architecture Diagram](./assets/architecture.png)
+![Architecture Diagram](./assets/diagram.png)
 
 ### Core Components
 
