@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { apiService, RAGRequest, RAGResponse } from '../services/api';
+import RetrievedChunks from './RetrievedChunks';
 
 interface Message {
   id: string;
@@ -16,13 +17,15 @@ interface Message {
 
 interface ChatInterfaceProps {
   className?: string;
+  onRetrievedChunks?: (chunks: any[]) => void;
 }
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ className = '' }) => {
+const ChatInterface: React.FC<ChatInterfaceProps> = ({ className = '', onRetrievedChunks }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentRetrievedChunks, setCurrentRetrievedChunks] = useState<any[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -65,6 +68,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className = '' }) => {
       const response = await apiService.ragQuery(request);
       
       if (response.success && response.data) {
+        // Store retrieved chunks and pass to parent
+        const retrievedChunks = response.data.retrieved_chunks || [];
+        setCurrentRetrievedChunks(retrievedChunks);
+        if (onRetrievedChunks) {
+          onRetrievedChunks(retrievedChunks);
+        }
+        
         const assistantMessage: Message = {
           id: generateMessageId(),
           type: 'assistant',
@@ -107,17 +117,17 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className = '' }) => {
   };
 
   return (
-    <div className={`bg-white rounded-lg shadow-lg ${className}`}>
+    <div className={`bg-card h-full flex flex-col ${className}`}>
       {/* Header */}
-      <div className="border-b border-gray-200 px-6 py-4">
+      <div className="border-b border-card-border px-6 py-4 flex-shrink-0 bg-card-light">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <h3 className="text-lg font-semibold text-gray-900">RAG Chat Interface</h3>
+            <div className="w-2 h-2 bg-success-500 rounded-full animate-pulse"></div>
+            <h3 className="text-lg font-semibold text-text-primary">Chat Interface</h3>
           </div>
           <button
             onClick={clearChat}
-            className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-md transition-colors"
+            className="px-3 py-1 text-sm text-text-secondary hover:text-text-primary hover:bg-card-hover rounded-md transition-all duration-200 shadow-card"
           >
             Clear Chat
           </button>
@@ -125,12 +135,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className = '' }) => {
       </div>
 
       {/* Messages Container */}
-      <div className="h-96 overflow-y-auto px-6 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
         {messages.length === 0 && (
-          <div className="text-center text-gray-500 py-8">
+          <div className="text-center text-text-secondary py-8">
             <div className="mb-4">
               <svg
-                className="mx-auto h-12 w-12 text-gray-400"
+                className="mx-auto h-12 w-12 text-text-muted"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -143,8 +153,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className = '' }) => {
                 />
               </svg>
             </div>
-            <p className="text-lg font-medium text-gray-600">Start a conversation</p>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-lg font-medium text-text-primary">Start a conversation</p>
+            <p className="text-sm text-text-secondary mt-1">
               Ask questions about your uploaded documents
             </p>
           </div>
@@ -153,13 +163,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className = '' }) => {
         {messages.map((message) => (
           <div
             key={message.id}
-            className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+            className={`flex ${message.type === 'user' ? 'justify-start' : 'justify-end'}`}
           >
             <div
-              className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg ${
+              className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg shadow-card ${
                 message.type === 'user'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-900'
+                  ? 'bg-card-light text-text-primary border border-card-border'
+                  : 'bg-primary-600 text-white'
               }`}
             >
               <div className="whitespace-pre-wrap break-words">
@@ -168,7 +178,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className = '' }) => {
               
               {/* Metadata for assistant messages */}
               {message.type === 'assistant' && message.metadata && (
-                <div className={`mt-2 text-xs text-gray-500`}>
+                <div className={`mt-2 text-xs text-primary-200`}>
                   <div className="flex items-center space-x-4">
                     {message.metadata.contextUsed && (
                       <span>Context: {message.metadata.contextUsed} chunks</span>
@@ -186,7 +196,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className = '' }) => {
               )}
               
               <div className={`text-xs mt-1 ${
-                message.type === 'user' ? 'text-blue-100' : 'text-gray-400'
+                message.type === 'user' ? 'text-text-muted' : 'text-primary-200'
               }`}>
                 {formatTimestamp(message.timestamp)}
               </div>
@@ -197,14 +207,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className = '' }) => {
         {/* Loading Indicator */}
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-gray-100 text-gray-900 px-4 py-3 rounded-lg">
+            <div className="bg-card-light text-text-primary px-4 py-3 rounded-lg max-w-xs lg:max-w-md border border-card-border shadow-card">
               <div className="flex items-center space-x-2">
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-gray-600 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-gray-600 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                  <div className="w-2 h-2 bg-gray-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                </div>
-                <span className="text-sm text-gray-600">Thinking...</span>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600"></div>
+                <span className="text-sm">Thinking...</span>
               </div>
             </div>
           </div>
@@ -213,7 +219,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className = '' }) => {
         {/* Error Display */}
         {error && (
           <div className="flex justify-center">
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg max-w-md">
+            <div className="bg-red-900/20 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg max-w-md shadow-card">
               <p className="text-sm">{error}</p>
             </div>
           </div>
@@ -223,7 +229,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className = '' }) => {
       </div>
 
       {/* Input Form */}
-      <div className="border-t border-gray-200 px-6 py-4">
+      <div className="border-t border-card-border px-6 py-4 flex-shrink-0 bg-card-light">
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="relative">
             <textarea
@@ -232,14 +238,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className = '' }) => {
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Ask a question about your documents..."
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              rows={3}
+              className="w-full px-4 py-3 bg-card border border-card-border rounded-lg resize-none focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none text-text-primary placeholder-text-text-muted"
+              rows={2}
               disabled={isLoading}
             />
             <button
               type="submit"
               disabled={!inputValue.trim() || isLoading}
-              className="absolute bottom-3 right-3 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="absolute bottom-3 right-3 px-3 py-1.5 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-card hover:shadow-card-hover"
             >
               {isLoading ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -260,12 +266,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className = '' }) => {
               )}
             </button>
           </div>
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-text-muted">
             Press Enter to send, Shift+Enter for new line
           </div>
         </form>
       </div>
-    </div>
+
+          </div>
   );
 };
 
