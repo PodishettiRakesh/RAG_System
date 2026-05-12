@@ -2,6 +2,7 @@
 module.exports = {
   content: [
     "./src/**/*.{js,jsx,ts,tsx}",
+    "./public/index.html"
   ],
   theme: {
     extend: {
@@ -76,6 +77,13 @@ module.exports = {
         'card': '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)',
         'card-hover': '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2)',
         'purple-glow': '0 0 20px rgba(168, 85, 247, 0.3)',
+      },
+      scrollbar: {
+        dark: {
+          thumb: '#475569',
+          track: '#1e293b',
+          hover: '#64748b',
+        },
       },
     },
   },
