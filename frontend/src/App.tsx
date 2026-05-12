@@ -1,6 +1,7 @@
 import React from 'react';
 import './App.css';
 import DocumentUpload from './components/DocumentUpload';
+import ChatInterface from './components/ChatInterface';
 import { UploadResponse } from './services/api';
 
 function App() {
@@ -30,15 +31,27 @@ function App() {
         <div className="space-y-8">
           <div className="text-center">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              Document Ingestion
+              RAG System Interface
             </h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Upload your text documents to create searchable chunks for the RAG system. 
-              Each document will be processed and stored with semantic embeddings.
+              Upload documents and chat with your RAG system. Documents are processed into searchable chunks 
+              for intelligent question-answering.
             </p>
           </div>
 
-          <DocumentUpload onUploadSuccess={handleUploadSuccess} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Document Upload Section */}
+            <div className="space-y-4">
+              <h3 className="text-2xl font-semibold text-gray-800">📄 Document Upload</h3>
+              <DocumentUpload onUploadSuccess={handleUploadSuccess} />
+            </div>
+
+            {/* Chat Interface Section */}
+            <div className="space-y-4">
+              <h3 className="text-2xl font-semibold text-gray-800">💬 Chat Interface</h3>
+              <ChatInterface />
+            </div>
+          </div>
         </div>
       </main>
     </div>

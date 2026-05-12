@@ -7,6 +7,32 @@ export interface UploadResponse {
   message: string;
 }
 
+export interface RAGRequest {
+  query: string;
+  k?: number;
+  max_length?: number;
+}
+
+export interface RAGResponse {
+  query: string;
+  response: string;
+  context_used: number;
+  context_preview: string;
+  model_info: {
+    model: string;
+    parameters: string;
+    type: string;
+  };
+  tokens_used: number;
+  retrieved_chunks: Array<{
+    rank: number;
+    chunk_id: number;
+    chunk_text: string;
+    similarity_score: number;
+    distance_type: string;
+  }>;
+}
+
 export interface ApiResponse<T> {
   data?: T;
   error?: string;
@@ -54,6 +80,13 @@ class ApiService {
 
   async getStoreStats(): Promise<ApiResponse<any>> {
     return this.request<any>('/store-stats');
+  }
+
+  async ragQuery(request: RAGRequest): Promise<ApiResponse<RAGResponse>> {
+    return this.request<RAGResponse>('/rag', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
   }
 }
 
