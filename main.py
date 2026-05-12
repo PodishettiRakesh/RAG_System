@@ -1,5 +1,6 @@
 import time
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ValidationError, Field
 from typing import List
@@ -10,6 +11,15 @@ from src.services.llm_service import LLMService
 from src.utils.observability import observability, PerformanceTracker
 
 app = FastAPI(title="RAG System API", version="1.0.0")
+
+# Configure CORS for frontend communication
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # React dev server
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class TextInput(BaseModel):
     text: str = Field(..., min_length=10, description="Text to process and store")
