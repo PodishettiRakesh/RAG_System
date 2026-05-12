@@ -64,7 +64,7 @@ const RetrievedChunks: React.FC<RetrievedChunksProps> = ({ chunks, className = '
           </div>
         </div>
         
-        <div className="space-y-3 max-h-64 overflow-y-auto">
+        <div className="space-y-3 max-h-64 overflow-y-auto scrollbar-dark">
           {chunks.map((chunk) => (
             <div
               key={chunk.chunk_id}

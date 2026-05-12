@@ -35,6 +35,36 @@ body::before {
   z-index: 1;
 }
 
+/* Dark scrollbar utility classes */
+.scrollbar-dark::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scrollbar-dark::-webkit-scrollbar-track {
+  background: #1e293b;
+  border-radius: 4px;
+}
+
+.scrollbar-dark::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 4px;
+}
+
+.scrollbar-dark::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+.scrollbar-dark::-webkit-scrollbar-corner {
+  background: #1e293b;
+}
+
+/* Firefox scrollbar styling */
+.scrollbar-dark {
+  scrollbar-width: thin;
+  scrollbar-color: #475569 #1e293b;
+}
+
 /* Ensure content is above pattern */
 main, header, .relative {
   position: relative;

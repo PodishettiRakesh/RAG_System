@@ -108,7 +108,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onUploadSuccess }) => {
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        <div className="flex flex-col items-center space-y-3">
+        <div className="flex-1 overflow-auto p-6 scrollbar-dark flex flex-col items-center space-y-3">
           <div className="text-text-secondary">
             <svg
               className="h-8 w-8"

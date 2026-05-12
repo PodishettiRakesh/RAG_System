@@ -3,6 +3,7 @@ import './App.css';
 import DocumentUpload from './components/DocumentUpload';
 import ChatInterface from './components/ChatInterface';
 import RetrievedChunks from './components/RetrievedChunks';
+import Metrics from './components/Metrics';
 import { UploadResponse } from './services/api';
 
 function App() {
@@ -47,20 +48,20 @@ function App() {
       <main className="h-[calc(100vh-73px)]">
         <div className="h-full flex">
           {/* Left Panel - Document Upload */}
-          <div className="w-1/2 border-r border-card-border bg-card">
+          <div className="w-1/4 border-r border-card-border bg-card">
             <div className="h-full flex flex-col">
-              <div className="px-6 py-4 border-b border-card-border bg-card-light">
-                <h2 className="text-lg font-semibold text-text-primary">Document Upload</h2>
-                <p className="text-sm text-text-secondary mt-1">Upload and process text documents</p>
+              <div className="px-4 py-3 border-b border-card-border bg-card-light">
+                <h2 className="text-sm font-semibold text-text-primary">Document Upload</h2>
+                <p className="text-xs text-text-secondary mt-1">Upload and process text documents</p>
               </div>
-              <div className="flex-1 overflow-auto p-6">
+              <div className="flex-1 overflow-auto p-4">
                 <DocumentUpload onUploadSuccess={handleUploadSuccess} />
               </div>
             </div>
           </div>
 
-          {/* Right Panel - Chat Interface */}
-          <div className="w-1/2 bg-card">
+          {/* Middle Panel - Chat Interface */}
+          <div className="w-1/2 border-r border-card-border bg-card">
             <div className="h-full flex flex-col">
               <div className="px-6 py-4 border-b border-card-border bg-card-light">
                 <h2 className="text-lg font-semibold text-text-primary">Chat Interface</h2>
@@ -71,6 +72,19 @@ function App() {
                   className="h-full border-none rounded-none" 
                   onRetrievedChunks={handleRetrievedChunks}
                 />
+              </div>
+            </div>
+          </div>
+
+          {/* Right Panel - Metrics */}
+          <div className="w-1/4 bg-card">
+            <div className="h-full flex flex-col">
+              <div className="px-4 py-3 border-b border-card-border bg-card-light">
+                <h2 className="text-sm font-semibold text-text-primary">System Metrics</h2>
+                <p className="text-xs text-text-secondary mt-1">Real-time performance data</p>
+              </div>
+              <div className="flex-1 overflow-auto p-4">
+                <Metrics />
               </div>
             </div>
           </div>
