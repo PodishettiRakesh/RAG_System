@@ -91,47 +91,49 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onUploadSuccess }) => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-lg">
-      <h2 className="text-2xl font-bold text-gray-800 mb-6">Document Upload</h2>
+    <div className="space-y-6">
+      <div className="text-center">
+        <h3 className="text-lg font-semibold text-text-primary">Upload Documents</h3>
+        <p className="text-sm text-text-secondary mt-1">Drag and drop or browse to upload text files</p>
+      </div>
       
       {/* File Drop Zone */}
       <div
-        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+        className={`border-2 border-dashed rounded-lg p-6 text-center transition-all duration-200 shadow-card ${
           isDragging
-            ? 'border-blue-500 bg-blue-50'
-            : 'border-gray-300 hover:border-gray-400'
+            ? 'border-primary-500 bg-card-light shadow-purple-glow'
+            : 'border-card-border bg-card hover:border-primary-400 hover:bg-card-hover'
         }`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        <div className="flex flex-col items-center space-y-4">
-          <div className="text-gray-500">
+        <div className="flex flex-col items-center space-y-3">
+          <div className="text-text-secondary">
             <svg
-              className="mx-auto h-12 w-12 text-gray-400"
-              stroke="currentColor"
+              className="h-8 w-8"
               fill="none"
-              viewBox="0 0 48 48"
-              aria-hidden="true"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
               <path
-                d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
-                strokeWidth={2}
                 strokeLinecap="round"
                 strokeLinejoin="round"
+                strokeWidth={2}
+                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
               />
             </svg>
           </div>
           
           <div>
-            <p className="text-lg text-gray-600">
+            <p className="text-sm text-text-primary">
               {isDragging ? 'Drop your file here' : 'Drag and drop your .txt file here'}
             </p>
-            <p className="text-sm text-gray-500 mt-1">or</p>
+            <p className="text-xs text-text-secondary mt-1">or</p>
           </div>
           
           <label className="cursor-pointer">
-            <span className="mt-2 inline-block px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+            <span className="inline-block px-3 py-1.5 bg-primary-600 text-white text-sm rounded-md hover:bg-primary-700 transition-all duration-200 shadow-card hover:shadow-card-hover">
               Browse Files
             </span>
             <input
@@ -146,26 +148,33 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onUploadSuccess }) => {
 
       {/* Selected File Info */}
       {textFile && (
-        <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+        <div className="p-4 bg-card-light rounded-lg border border-card-border shadow-card">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium text-gray-800">{textFile.name}</p>
-              <p className="text-sm text-gray-500">
-                {(textFile.size / 1024).toFixed(2)} KB
-              </p>
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-primary-100 rounded flex items-center justify-center">
+                <svg className="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-text-primary">{textFile.name}</p>
+                <p className="text-xs text-text-secondary">
+                  {(textFile.size / 1024).toFixed(2)} KB
+                </p>
+              </div>
             </div>
             <div className="flex space-x-2">
               <button
                 onClick={handleUpload}
                 disabled={isUploading}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-3 py-1.5 bg-primary-600 text-white text-sm rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-card hover:shadow-card-hover"
               >
                 {isUploading ? 'Uploading...' : 'Upload'}
               </button>
               <button
                 onClick={resetUpload}
                 disabled={isUploading}
-                className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-3 py-1.5 bg-card-hover text-text-primary text-sm rounded-md hover:bg-card-border disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-card"
               >
                 Clear
               </button>
@@ -176,26 +185,36 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onUploadSuccess }) => {
 
       {/* Upload Progress */}
       {isUploading && (
-        <div className="mt-6">
-          <div className="flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span className="ml-3 text-gray-600">Processing document and creating chunks...</span>
+        <div className="p-4 bg-card-light rounded-lg border border-primary-500 shadow-purple-glow">
+          <div className="flex items-center justify-center space-x-3">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-600"></div>
+            <span className="text-sm text-primary-400">Processing document and creating chunks...</span>
           </div>
         </div>
       )}
 
       {/* Error Display */}
       {error && (
-        <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-red-600">{error}</p>
+        <div className="p-4 bg-red-900/20 rounded-lg border border-red-500/30 shadow-card">
+          <div className="flex items-center space-x-2">
+            <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-sm text-red-400">{error}</p>
+          </div>
         </div>
       )}
 
       {/* Upload Success */}
       {uploadResult && (
-        <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-          <h3 className="font-semibold text-green-800 mb-2">Upload Successful!</h3>
-          <div className="space-y-1 text-sm text-green-700">
+        <div className="p-4 bg-success-900/20 rounded-lg border border-success-500/30 shadow-card">
+          <div className="flex items-center space-x-2 mb-3">
+            <svg className="w-5 h-5 text-success-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h3 className="text-sm font-semibold text-success-400">Upload Successful!</h3>
+          </div>
+          <div className="space-y-1 text-xs text-success-300">
             <p>📄 Total words: {uploadResult.total_words}</p>
             <p>🧩 Chunks created: {uploadResult.total_chunks}</p>
             <p>✅ {uploadResult.message}</p>
