@@ -1,3 +1,4 @@
+import os
 import time
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,7 +16,15 @@ app = FastAPI(title="RAG System API", version="1.0.0")
 # Configure CORS for frontend communication
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # React dev server
+    allow_origins=[
+        origin
+        for origin in [
+            "http://localhost:3000",
+            "https://rag-system-blush.vercel.app",
+            os.getenv("FRONTEND_URL", ""),
+        ]
+        if origin
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
