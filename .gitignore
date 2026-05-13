@@ -69,3 +69,6 @@ frontend/.nyc_output/
 # Frontend temporary files
 frontend/.temp/
 frontend/tmp/
+
+# Hugging Face Spaces: keep large/binary assets out of git (use LFS if needed)
+assets/
