@@ -201,7 +201,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className = '', onRetriev
               metadata: {
                 ...m.metadata,
                 tokensUsed: data.tokens_used as number,
-                totalLatencyMs: data.total_latency_ms as number,
+                totalLatencyMs: Math.round(((data.total_latency_ms as number) / 1000) * 10) / 10,
                 modelInfo: data.model_info,
                 contextUsed: (data.context_used as number) || m.metadata?.contextUsed,
               },
@@ -348,7 +348,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className = '', onRetriev
                         <span>Tokens: {message.metadata.tokensUsed}</span>
                       )}
                       {message.metadata.totalLatencyMs != null && (
-                        <span>{message.metadata.totalLatencyMs} ms</span>
+                        <span>{message.metadata.totalLatencyMs} s</span>
                       )}
                     </div>
                     {message.metadata.hallucinationDetected != null && (
