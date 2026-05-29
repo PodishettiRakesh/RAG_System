@@ -2,7 +2,7 @@ import os
 import time
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, ValidationError, Field
 from typing import List
 from src.services.user_input_service import UserInputService
@@ -10,6 +10,8 @@ from src.services.embedding_service import EmbeddingService
 from src.services.vector_store_service import VectorStoreService
 from src.services.llm_service import LLMService
 from src.utils.observability import observability, PerformanceTracker
+from src.utils.rag_retrieval import filter_search_results, compute_retrieval_confidence
+from src.services.rag_stream_service import RagStreamService
 
 app = FastAPI(title="RAG System API", version="1.0.0")
 
@@ -87,6 +89,13 @@ user_input_service = UserInputService()
 embedding_service = EmbeddingService()
 vector_store = VectorStoreService()
 llm_service = LLMService()
+rag_stream_service = RagStreamService(vector_store, llm_service)
+
+SSE_HEADERS = {
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no",
+}
 
 @app.exception_handler(ValidationError)
 async def validation_exception_handler(request: Request, exc: ValidationError):
@@ -305,7 +314,6 @@ async def rag_query(request: RAGRequest):
         tracker.mark_step("search_complete")
         
         # Step 1.5: Filter chunks by similarity threshold
-        similarity_threshold = 1.5  # Lower is better for L2 distance
         print(f"🔍 RETRIEVAL RESULTS")
         print(f"Top-K: {len(search_results)}")
         print()
@@ -315,13 +323,9 @@ async def rag_query(request: RAGRequest):
             chunk_id = result.get('chunk_id', 'N/A')
             print(f"{i}. Chunk {chunk_id} → Distance: {distance:.2f}")
         
-        filtered_results = []
-        for result in search_results:
-            similarity_score = result.get("similarity_score", float('inf'))
-            if similarity_score <= similarity_threshold:
-                filtered_results.append(result)
+        filtered_results, original_count = filter_search_results(search_results)
         
-        print(f"🔍 Similarity filtering: {len(search_results)} → {len(filtered_results)} chunks (threshold: {similarity_threshold})")
+        print(f"🔍 Similarity filtering: {original_count} → {len(filtered_results)} chunks")
         
         if not filtered_results:
             print(f"🚫 FILTER RESULT:")
@@ -370,11 +374,8 @@ async def rag_query(request: RAGRequest):
         # Add context awareness
         print(f"📄 CONTEXT USED: {len(search_results)} chunks (relevant, below threshold)")
         
-        # Calculate answer confidence based on retrieval quality
-        avg_distance = sum(distances) / len(distances) if distances else float('inf')
-        confidence_score = max(0.0, min(1.0, 1.0 - (avg_distance / 2.0)))  # Normalize to 0-1
-        confidence_label = "HIGH" if confidence_score > 0.7 else "MEDIUM" if confidence_score > 0.4 else "LOW"
-        print(f"Confidence Score: {confidence_label} ({confidence_score:.1f})")
+        confidence_score, confidence_label = compute_retrieval_confidence(distances)
+        print(f"Confidence Score: {confidence_label} ({confidence_score})")
         
         # Add final verdict
         print()
@@ -397,6 +398,28 @@ async def rag_query(request: RAGRequest):
     except Exception as e:
         print(f"RAG pipeline error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"RAG pipeline error: {str(e)}")
+
+
+@app.post("/rag/stream")
+async def rag_stream(request: RAGRequest, raw_request: Request):
+    """Stream RAG pipeline stages and tokens via Server-Sent Events."""
+    query = request.query.strip()
+    if not query:
+        raise HTTPException(status_code=400, detail="Query cannot be empty")
+    if request.k <= 0:
+        raise HTTPException(status_code=400, detail="k must be positive")
+
+    return StreamingResponse(
+        rag_stream_service.stream(
+            raw_request,
+            query=query,
+            k=request.k,
+            max_length=request.max_length,
+        ),
+        media_type="text/event-stream",
+        headers=SSE_HEADERS,
+    )
+
 
 @app.get("/llm-stats")
 async def get_llm_stats():
@@ -514,6 +537,7 @@ async def root():
                 "stored_chunks": "/stored-chunks (GET)",
                 "search": "/search (POST)",
                 "rag": "/rag (POST)",
+                "rag_stream": "/rag/stream (POST, SSE)",
                 "llm_stats": "/llm-stats (GET)",
                 "observability_metrics": "/observability/metrics (GET)",
                 "detailed_structure": "/detailed-structure (GET)",
@@ -525,7 +549,8 @@ async def root():
                 "LLM-powered responses",
                 "Comprehensive observability",
                 "Latency tracking",
-                "Anti-hallucination measures"
+                "Anti-hallucination measures",
+                "SSE streaming RAG pipeline"
             ]
         }
     )
