@@ -1,5 +1,6 @@
 import os
 import time
+import uuid
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -83,6 +84,9 @@ class StoreResponse(BaseModel):
     chunks_added: int = Field(..., description="Number of chunks added to storage")
     total_chunks: int = Field(..., description="Total number of chunks in storage after addition")
     stats: dict = Field(..., description="Storage statistics")
+
+class SessionResponse(BaseModel):
+    session_id: str = Field(..., description="Session identifier for conversation history")
 
 # Initialize services
 user_input_service = UserInputService()
@@ -270,6 +274,12 @@ async def process_text(input_data: TextInput):
     except Exception as e:
         print(f"❌ Error in process_text: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error processing text: {str(e)}")
+
+@app.get("/session", response_model=SessionResponse)
+async def create_session():
+    """Create a new session identifier for the UI."""
+    session_id = str(uuid.uuid4())
+    return SessionResponse(session_id=session_id)
 
 @app.get("/health")
 async def health_check():
