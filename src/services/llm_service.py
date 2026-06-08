@@ -1,5 +1,6 @@
-from typing import List, Dict
-from transformers import pipeline
+from typing import Iterator, List, Dict
+from threading import Thread
+from transformers import pipeline, TextIteratorStreamer
 import torch
 from src.utils.observability import observability, track_operation, PerformanceTracker
 
@@ -217,6 +218,58 @@ ANSWER:"""
                     "error": True
                 }
     
+    def generate_response_stream(
+        self, query: str, search_results: List[Dict], max_length: int = 200
+    ) -> Iterator[str]:
+        """
+        Stream decoded text fragments as the model generates them.
+
+        Args:
+            query: User query
+            search_results: Retrieved context chunks
+            max_length: Maximum new tokens to generate
+
+        Yields:
+            Incremental decoded text fragments
+        """
+        context = self.format_context(search_results)
+        prompt = self.create_prompt(context, query)
+
+        model = self.generator.model
+        tokenizer = self.generator.tokenizer
+        device = model.device
+
+        inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512)
+        inputs = {k: v.to(device) for k, v in inputs.items()}
+
+        streamer = TextIteratorStreamer(
+            tokenizer,
+            skip_prompt=True,
+            skip_special_tokens=True,
+        )
+
+        generation_kwargs = {
+            **inputs,
+            "max_new_tokens": max_length,
+            "temperature": 0.1,
+            "do_sample": True,
+            "top_k": 50,
+            "top_p": 0.9,
+            "repetition_penalty": 1.1,
+            "pad_token_id": tokenizer.eos_token_id,
+            "streamer": streamer,
+        }
+
+        thread = Thread(target=model.generate, kwargs=generation_kwargs)
+        thread.start()
+
+        try:
+            for text in streamer:
+                if text:
+                    yield text
+        finally:
+            thread.join()
+
     def get_model_stats(self) -> Dict:
         """Get model and service statistics."""
         return {
