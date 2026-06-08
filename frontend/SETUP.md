@@ -93,4 +93,4 @@ frontend/
 - Retrieved chunks display
 - Metrics dashboard
 - Hallucination indicators
-- Real-time streaming with Socket.IO
+- SSE streaming via `POST /rag/stream` (implemented; set `REACT_APP_API_URL` to backend URL)

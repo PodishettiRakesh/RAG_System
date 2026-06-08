@@ -63,7 +63,7 @@ Embeddings         Similarity Search  Response Gen      Documentation
 #### 1. Text Processing Pipeline
 - **UserInputService**: Handles text input and coordinates chunking
 - **TextChunker**: Splits documents into semantically meaningful chunks (50 words each)
-- **SimpleEmbeddingService**: Generates 384-dimensional embeddings (currently mock implementation)
+- **EmbeddingService**: Generates 384-dimensional embeddings via `all-MiniLM-L6-v2`
 
 #### 2. Vector Storage & Retrieval
 - **VectorStoreService**: Manages FAISS index for efficient similarity search
@@ -97,9 +97,8 @@ transformers==4.30.0      # LLM models ✅ ACTIVELY USED
 torch==2.0.1              # Deep learning framework ✅ ACTIVELY USED
 ```
 
-**Note**: Currently using SimpleEmbeddingService (mock embeddings) instead of sentence-transformers for embeddings.
-
 ---
+
 
 ## 🌐 API Reference
 
@@ -144,6 +143,17 @@ curl -X POST "http://localhost:8000/rag" \
      -H "Content-Type: application/json" \
      -d '{"query": "Your question here", "k": 3, "max_length": 200}'
 ```
+
+**POST /rag/stream**
+Streaming RAG pipeline via Server-Sent Events (used by the React chat UI)
+
+```bash
+curl -N -X POST "http://localhost:8000/rag/stream" \
+     -H "Content-Type: application/json" \
+     -d '{"query": "Your question here", "k": 3, "max_length": 200}'
+```
+
+Events: `retrieval_started`, `retrieval_completed`, `generation_started`, `token`, `evaluation_complete`, `completed`, `error`
 
 #### 3. System Information
 

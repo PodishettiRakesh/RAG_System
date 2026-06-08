@@ -199,9 +199,30 @@ Answer generated using grounded context → HIGH confidence
 |--------|------------|
 | `/store-chunks` | Store document chunks |
 | `/search` | Retrieve similar chunks |
-| `/rag` | Full pipeline |
+| `/rag` | Full pipeline (JSON) |
+| `/rag/stream` | Streaming pipeline (SSE) |
 | `/store-stats` | Vector DB stats |
 | `/health` | System health |
+
+---
+
+## Streaming RAG (SSE)
+
+The chat UI uses `POST /rag/stream` for production-style incremental responses.
+
+**Event flow:** `retrieval_started` → `retrieval_completed` → `generation_started` → `token` (repeated) → `evaluation_complete` → `completed`
+
+**Test with curl:**
+
+```bash
+curl -N -X POST "http://localhost:8000/rag/stream" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "What is the Strait of Hormuz?", "k": 3, "max_length": 200}'
+```
+
+**Deployment notes (Hugging Face / nginx):** If events arrive in one batch instead of incrementally, ensure the backend sends `Cache-Control: no-cache`, `Connection: keep-alive`, and `X-Accel-Buffering: no`. Some reverse proxies buffer SSE until the response completes.
+
+**Frontend:** Set `REACT_APP_API_URL` to your Hugging Face Space URL on Vercel.
 
 ---
 
@@ -267,7 +288,7 @@ RAG_System/
 - Hybrid retrieval (BM25 + vector) to reduce semantic misses
 - Cross-encoder re-ranking to improve top-K precision
 - LLM-as-a-judge for semantic evaluation
-- Streaming responses for better UX
+- Multi-turn conversation memory
 - Persistent vector DB (Weaviate / Pinecone)
 
 ---
