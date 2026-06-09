@@ -200,6 +200,8 @@ Answer generated using grounded context → HIGH confidence
 | `/store-chunks` | Store document chunks |
 | `/search` | Retrieve similar chunks |
 | `/rag` | Full pipeline (JSON) |
+| `/session` | Create a new conversation session |
+| `/session/{session_id}` | Retrieve stored session history |
 | `/rag/stream` | Streaming pipeline (SSE) |
 | `/store-stats` | Vector DB stats |
 | `/health` | System health |

@@ -11,6 +11,7 @@ export interface RAGRequest {
   query: string;
   k?: number;
   max_length?: number;
+  session_id?: string;
 }
 
 export interface RAGResponse {
@@ -58,6 +59,13 @@ export interface ApiResponse<T> {
   data?: T;
   error?: string;
   success: boolean;
+}
+
+export interface SessionMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+  message_id: string;
 }
 
 function parseSSEChunk(chunk: string): StreamEvent | null {
@@ -127,6 +135,41 @@ class ApiService {
     return this.request<any>('/store-stats');
   }
 
+  async getSessionId(): Promise<ApiResponse<string>> {
+    const response = await this.request<{ session_id: string }>('/session');
+    if (!response.success || !response.data) {
+      return {
+        success: false,
+        error: response.error || 'Failed to create session',
+      };
+    }
+
+    return {
+      success: true,
+      data: response.data.session_id,
+    };
+  }
+
+  async getSessionHistory(sessionId: string): Promise<ApiResponse<SessionMessage[]>> {
+    const response = await this.request<{ session_id: string; history: SessionMessage[] }>(`/session/${sessionId}`);
+    if (!response.success || !response.data) {
+      return {
+        success: false,
+        error: response.error || 'Failed to load session history',
+      };
+    }
+    return {
+      success: true,
+      data: response.data.history,
+    };
+  }
+
+  async clearSession(sessionId: string): Promise<ApiResponse<any>> {
+    return this.request<any>(`/session/${sessionId}`, {
+      method: 'DELETE',
+    });
+  }
+
   async ragQuery(request: RAGRequest): Promise<ApiResponse<RAGResponse>> {
     return this.request<RAGResponse>('/rag', {
       method: 'POST',
@@ -146,6 +189,7 @@ class ApiService {
         query: request.query,
         k: request.k ?? 3,
         max_length: request.max_length ?? 200,
+        session_id: request.session_id,
       }),
       signal,
     });
