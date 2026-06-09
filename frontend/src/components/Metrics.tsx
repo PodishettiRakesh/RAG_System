@@ -123,8 +123,8 @@ const Metrics: React.FC = () => {
     };
 
     fetchMetrics();
-    // Refresh metrics every 30 seconds
-    const interval = setInterval(fetchMetrics, 30000);
+    // Refresh metrics every 2 minutes
+    const interval = setInterval(fetchMetrics,1000*60*2);
     return () => clearInterval(interval);
   }, []);
 

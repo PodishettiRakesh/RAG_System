@@ -1,8 +1,9 @@
-from typing import Iterator, List, Dict
+from typing import Iterator, List, Dict, Optional
 from threading import Thread
 from transformers import pipeline, TextIteratorStreamer
 import torch
 from src.utils.observability import observability, track_operation, PerformanceTracker
+
 
 
 class LLMService:
@@ -46,6 +47,18 @@ class LLMService:
         print("│ Speed: ~50ms per response (CPU)     │")
         print("└─────────────────────────────────────┘")
         print()
+
+    def _format_conversation_history(self, conversation_history: Optional[List[Dict]]) -> str:
+        if not conversation_history:
+            return ""
+
+        formatted = []
+        for turn in conversation_history:
+            role = turn.get("role", "").capitalize()
+            content = turn.get("content", "")
+            formatted.append(f"{role}: {content}")
+
+        return "CONVERSATION HISTORY:\n" + "\n".join(formatted) + "\n\n"
     
     def format_context(self, search_results: List[Dict]) -> str:
         """
@@ -66,7 +79,7 @@ class LLMService:
         
         return "\n\n".join(context_parts)
     
-    def create_prompt(self, context: str, query: str) -> str:
+    def create_prompt(self, context: str, query: str, conversation_history: Optional[List[Dict]] = None) -> str:
         """
         Create a structured prompt for the LLM with enhanced anti-hallucination measures.
         
@@ -77,6 +90,8 @@ class LLMService:
         Returns:
             str: Formatted prompt
         """
+        conversation_block = self._format_conversation_history(conversation_history)
+
         prompt = f"""You are a helpful AI assistant that answers questions based ONLY on the provided context.
 
 STRICT RULES:
@@ -86,7 +101,7 @@ STRICT RULES:
 4. Do NOT use general knowledge - stick strictly to the given context
 5. If you're unsure about any detail, admit it rather than guessing
 
-CONTEXT:
+{conversation_block}CONTEXT:
 {context}
 
 QUESTION: {query}
@@ -133,7 +148,13 @@ ANSWER:"""
         return response
     
     @track_operation("llm_generation")
-    def generate_response(self, query: str, search_results: List[Dict], max_length: int = 200) -> Dict:
+    def generate_response(
+        self,
+        query: str,
+        search_results: List[Dict],
+        max_length: int = 200,
+        conversation_history: Optional[List[Dict]] = None,
+    ) -> Dict:
         """
         Generate response using LLM with retrieved context.
         
@@ -158,7 +179,7 @@ ANSWER:"""
                 context = self.format_context(search_results)
                 
                 # Create prompt
-                prompt = self.create_prompt(context, query)
+                prompt = self.create_prompt(context, query, conversation_history)
                 
                 print(f"Prompt length: {len(prompt)} characters")
                 
@@ -219,7 +240,11 @@ ANSWER:"""
                 }
     
     def generate_response_stream(
-        self, query: str, search_results: List[Dict], max_length: int = 200
+        self,
+        query: str,
+        search_results: List[Dict],
+        max_length: int = 200,
+        conversation_history: Optional[List[Dict]] = None,
     ) -> Iterator[str]:
         """
         Stream decoded text fragments as the model generates them.
@@ -233,7 +258,7 @@ ANSWER:"""
             Incremental decoded text fragments
         """
         context = self.format_context(search_results)
-        prompt = self.create_prompt(context, query)
+        prompt = self.create_prompt(context, query, conversation_history)
 
         model = self.generator.model
         tokenizer = self.generator.tokenizer
