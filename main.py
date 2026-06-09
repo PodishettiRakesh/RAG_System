@@ -10,6 +10,15 @@ from src.services.user_input_service import UserInputService
 from src.services.embedding_service import EmbeddingService
 from src.services.vector_store_service import VectorStoreService
 from src.services.llm_service import LLMService
+from src.services.session_service import (
+    SessionHistoryResponse,
+    SessionResponse,
+    clear_session_history,
+    create_session,
+    get_recent_history,
+    get_session_history,
+    save_session_message,
+)
 from src.utils.observability import observability, PerformanceTracker
 from src.utils.rag_retrieval import filter_search_results, compute_retrieval_confidence
 from src.services.rag_stream_service import RagStreamService
@@ -86,23 +95,6 @@ class StoreResponse(BaseModel):
     total_chunks: int = Field(..., description="Total number of chunks in storage after addition")
     stats: dict = Field(..., description="Storage statistics")
 
-class SessionResponse(BaseModel):
-    session_id: str = Field(..., description="Session identifier for conversation history")
-
-class SessionMessage(BaseModel):
-    role: str = Field(..., description="Message role: user or assistant")
-    content: str = Field(..., description="Message content")
-    timestamp: str = Field(..., description="ISO 8601 timestamp")
-    message_id: str = Field(..., description="Unique message identifier")
-
-class SessionHistoryResponse(BaseModel):
-    session_id: str = Field(..., description="Session identifier for conversation history")
-    history: List[SessionMessage] = Field(..., description="Ordered conversation history")
-
-# In-memory session store for version 1
-session_store: Dict[str, List[Dict[str, str]]] = {}
-MAX_HISTORY_TURNS = 10
-
 # Initialize services
 user_input_service = UserInputService()
 embedding_service = EmbeddingService()
@@ -116,26 +108,6 @@ SSE_HEADERS = {
     "X-Accel-Buffering": "no",
 }
 
-
-def get_session_history(session_id: str) -> List[Dict[str, str]]:
-    return session_store.get(session_id, [])
-
-
-def get_recent_history(session_id: str, max_turns: int = MAX_HISTORY_TURNS) -> List[Dict[str, str]]:
-    return get_session_history(session_id)[-max_turns:]
-
-
-def save_session_message(session_id: str, role: str, content: str) -> Dict[str, str]:
-    if not session_id:
-        return {}
-    message = {
-        "role": role,
-        "content": content,
-        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "message_id": str(uuid.uuid4()),
-    }
-    session_store.setdefault(session_id, []).append(message)
-    return message
 
 @app.exception_handler(ValidationError)
 async def validation_exception_handler(request: Request, exc: ValidationError):
@@ -312,10 +284,9 @@ async def process_text(input_data: TextInput):
         raise HTTPException(status_code=500, detail=f"Error processing text: {str(e)}")
 
 @app.get("/session", response_model=SessionResponse)
-async def create_session():
+async def create_session_endpoint():
     """Create a new session identifier for the UI."""
-    session_id = str(uuid.uuid4())
-    session_store.setdefault(session_id, [])
+    session_id = create_session()
     return SessionResponse(session_id=session_id)
 
 @app.get("/session/{session_id}", response_model=SessionHistoryResponse)
@@ -327,7 +298,7 @@ async def get_session(session_id: str):
 @app.delete("/session/{session_id}")
 async def clear_session(session_id: str):
     """Clear stored history for an existing session."""
-    session_store.pop(session_id, None)
+    clear_session_history(session_id)
     return JSONResponse(
         status_code=200,
         content={
