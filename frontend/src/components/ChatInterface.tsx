@@ -41,7 +41,10 @@ const PIPELINE_LABELS: Record<PipelineStage, string> = {
   error: '',
 };
 
+const SESSION_STORAGE_KEY = 'rag_session_id';
+
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ className = '', onRetrievedChunks }) => {
+  const [sessionId, setSessionId] = useState<string>('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
@@ -54,6 +57,55 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className = '', onRetriev
   const abortControllerRef = useRef<AbortController | null>(null);
   const streamingMessageIdRef = useRef<string | null>(null);
   const shouldAutoScrollRef = useRef(true);
+
+  useEffect(() => {
+    const initializeSession = async () => {
+      const existingSessionId = localStorage.getItem(SESSION_STORAGE_KEY);
+      if (existingSessionId) {
+        setSessionId(existingSessionId);
+        const historyResponse = await apiService.getSessionHistory(existingSessionId);
+        if (historyResponse.success && historyResponse.data) {
+          setMessages(
+            historyResponse.data.map((item) => ({
+              id: item.message_id,
+              type: item.role === 'assistant' ? 'assistant' : 'user',
+              content: item.content,
+              timestamp: new Date(item.timestamp),
+              isStreaming: false,
+            }))
+          );
+        }
+        return;
+      }
+
+      const response = await apiService.getSessionId();
+      if (response.success && response.data) {
+        localStorage.setItem(SESSION_STORAGE_KEY, response.data);
+        setSessionId(response.data);
+        const historyResponse = await apiService.getSessionHistory(response.data);
+        if (historyResponse.success && historyResponse.data) {
+          setMessages(
+            historyResponse.data.map((item) => ({
+              id: item.message_id,
+              type: item.role === 'assistant' ? 'assistant' : 'user',
+              content: item.content,
+              timestamp: new Date(item.timestamp),
+              isStreaming: false,
+            }))
+          );
+        }
+      } else {
+        console.error('Unable to obtain session ID:', response.error);
+        setError('Unable to initialize session. Please refresh.');
+      }
+    };
+
+    initializeSession();
+  }, []);
+
+  useEffect(() => {
+    if (!sessionId) return;
+  }, [messages, sessionId]);
 
   const isNearBottom = useCallback(() => {
     const el = messagesContainerRef.current;
@@ -137,10 +189,25 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className = '', onRetriev
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
+    let currentSessionId = sessionId;
+    if (!currentSessionId) {
+      const sessionResponse = await apiService.getSessionId();
+      if (sessionResponse.success && sessionResponse.data) {
+        currentSessionId = sessionResponse.data;
+        localStorage.setItem(SESSION_STORAGE_KEY, currentSessionId);
+        setSessionId(currentSessionId);
+      } else {
+        setError('Unable to obtain session ID. Please try again.');
+        setIsStreaming(false);
+        return;
+      }
+    }
+
     const request: RAGRequest = {
       query: userMessage.content,
       k: 3,
       max_length: 200,
+      session_id: currentSessionId,
     };
 
     try {
@@ -248,6 +315,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className = '', onRetriev
     setError(null);
     setPipelineStage('idle');
     setPipelineDetail('');
+    if (sessionId) {
+      apiService.clearSession(sessionId).catch(() => {
+        console.error('Failed to clear session history');
+      });
+    }
   };
 
   const formatTimestamp = (date: Date) => {

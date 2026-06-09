@@ -5,11 +5,20 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, ValidationError, Field
-from typing import List
+from typing import List, Optional, Dict
 from src.services.user_input_service import UserInputService
 from src.services.embedding_service import EmbeddingService
 from src.services.vector_store_service import VectorStoreService
 from src.services.llm_service import LLMService
+from src.services.session_service import (
+    SessionHistoryResponse,
+    SessionResponse,
+    clear_session_history,
+    create_session,
+    get_recent_history,
+    get_session_history,
+    save_session_message,
+)
 from src.utils.observability import observability, PerformanceTracker
 from src.utils.rag_retrieval import filter_search_results, compute_retrieval_confidence
 from src.services.rag_stream_service import RagStreamService
@@ -44,6 +53,7 @@ class RAGRequest(BaseModel):
     query: str = Field(..., min_length=1, description="Query for RAG pipeline")
     k: int = Field(3, ge=1, le=10, description="Number of context chunks to retrieve")
     max_length: int = Field(200, ge=50, le=500, description="Maximum response length")
+    session_id: Optional[str] = Field(None, description="Session identifier for conversation history")
 
 class ChunkResponse(BaseModel):
     total_words: int = Field(..., description="Total number of words in input text")
@@ -85,9 +95,6 @@ class StoreResponse(BaseModel):
     total_chunks: int = Field(..., description="Total number of chunks in storage after addition")
     stats: dict = Field(..., description="Storage statistics")
 
-class SessionResponse(BaseModel):
-    session_id: str = Field(..., description="Session identifier for conversation history")
-
 # Initialize services
 user_input_service = UserInputService()
 embedding_service = EmbeddingService()
@@ -100,6 +107,7 @@ SSE_HEADERS = {
     "Connection": "keep-alive",
     "X-Accel-Buffering": "no",
 }
+
 
 @app.exception_handler(ValidationError)
 async def validation_exception_handler(request: Request, exc: ValidationError):
@@ -276,10 +284,29 @@ async def process_text(input_data: TextInput):
         raise HTTPException(status_code=500, detail=f"Error processing text: {str(e)}")
 
 @app.get("/session", response_model=SessionResponse)
-async def create_session():
+async def create_session_endpoint():
     """Create a new session identifier for the UI."""
-    session_id = str(uuid.uuid4())
+    session_id = create_session()
     return SessionResponse(session_id=session_id)
+
+@app.get("/session/{session_id}", response_model=SessionHistoryResponse)
+async def get_session(session_id: str):
+    """Return backend-stored conversation history for the given session."""
+    history = get_session_history(session_id)
+    return SessionHistoryResponse(session_id=session_id, history=history)
+
+@app.delete("/session/{session_id}")
+async def clear_session(session_id: str):
+    """Clear stored history for an existing session."""
+    clear_session_history(session_id)
+    return JSONResponse(
+        status_code=200,
+        content={
+            "session_id": session_id,
+            "cleared": True,
+            "history_size": 0,
+        },
+    )
 
 @app.get("/health")
 async def health_check():
@@ -307,6 +334,7 @@ async def rag_query(request: RAGRequest):
         query = request.query
         k = request.k
         max_length = request.max_length
+        session_id = request.session_id
         
         # Validate inputs
         if not query.strip():
@@ -315,6 +343,9 @@ async def rag_query(request: RAGRequest):
         if k <= 0:
             raise HTTPException(status_code=400, detail="k must be positive")
         
+        # Build prompt history from session if available
+        conversation_history = get_recent_history(session_id) if session_id else []
+
         # Initialize performance tracker
         tracker = PerformanceTracker(f"rag_{int(time.time())}")
         
@@ -350,11 +381,20 @@ async def rag_query(request: RAGRequest):
         
         # Step 2: Generate LLM response
         tracker.mark_step("llm_start")
-        llm_result = llm_service.generate_response(query, search_results, max_length)
+        llm_result = llm_service.generate_response(
+            query,
+            search_results,
+            max_length,
+            conversation_history,
+        )
         tracker.mark_step("llm_complete")
         
         if llm_result.get("error"):
             raise HTTPException(status_code=500, detail="Error generating response")
+
+        if session_id:
+            save_session_message(session_id, "user", query)
+            save_session_message(session_id, "assistant", llm_result["response"])
         
         # Step 3: Calculate latencies
         total_latency = tracker.get_total_latency()
@@ -414,10 +454,15 @@ async def rag_query(request: RAGRequest):
 async def rag_stream(request: RAGRequest, raw_request: Request):
     """Stream RAG pipeline stages and tokens via Server-Sent Events."""
     query = request.query.strip()
+    session_id = request.session_id
     if not query:
         raise HTTPException(status_code=400, detail="Query cannot be empty")
     if request.k <= 0:
         raise HTTPException(status_code=400, detail="k must be positive")
+
+    conversation_history = get_recent_history(session_id) if session_id else []
+    if session_id:
+        save_session_message(session_id, "user", query)
 
     return StreamingResponse(
         rag_stream_service.stream(
@@ -425,6 +470,13 @@ async def rag_stream(request: RAGRequest, raw_request: Request):
             query=query,
             k=request.k,
             max_length=request.max_length,
+            session_id=session_id,
+            conversation_history=conversation_history,
+            on_stream_complete=(
+                lambda response: save_session_message(session_id, "assistant", response)
+                if session_id
+                else None
+            ),
         ),
         media_type="text/event-stream",
         headers=SSE_HEADERS,

@@ -1,7 +1,7 @@
 """SSE streaming orchestrator for the RAG pipeline."""
 
 import time
-from typing import AsyncIterator, List, Dict, Any
+from typing import AsyncIterator, List, Dict, Any, Optional, Callable
 
 from fastapi import Request
 
@@ -31,6 +31,9 @@ class RagStreamService:
         query: str,
         k: int,
         max_length: int,
+        session_id: Optional[str] = None,
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
+        on_stream_complete: Optional[Callable[[str], None]] = None,
     ) -> AsyncIterator[str]:
         """
         Yield SSE-formatted events for the full RAG pipeline.
@@ -107,6 +110,7 @@ class RagStreamService:
             llm_start = time.time()
             for token_text in self.llm_service.generate_response_stream(
                 query, search_results, max_length
+                , conversation_history=conversation_history
             ):
                 if await http_request.is_disconnected():
                     return
@@ -155,6 +159,9 @@ class RagStreamService:
                 distances=distances,
                 response_text=full_response,
             )
+
+            if on_stream_complete:
+                on_stream_complete(full_response)
 
             yield format_sse(
                 "completed",
