@@ -86,10 +86,11 @@ const RetrievedChunks: React.FC<RetrievedChunksProps> = ({ chunks, className = '
               </div>
               
               <div className="text-sm text-text-primary leading-relaxed mb-2">
-                {chunk.chunk_text.length > 150 
+                {/* {chunk.chunk_text.length > 150 
                   ? `${chunk.chunk_text.substring(0, 150)}...`
                   : chunk.chunk_text
-                }
+                } */}
+                {chunk.chunk_text}
               </div>
               
               <div className="flex items-center justify-between text-xs text-text-muted">

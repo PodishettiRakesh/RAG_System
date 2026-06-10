@@ -92,21 +92,26 @@ class LLMService:
         """
         conversation_block = self._format_conversation_history(conversation_history)
 
-        prompt = f"""You are a helpful AI assistant that answers questions based ONLY on the provided context.
+        prompt = f"""You are a helpful AI assistant.
 
-STRICT RULES:
-1. Use ONLY the information in the CONTEXT below
-2. Do NOT make up, infer, or assume any information not explicitly stated in the context
-3. If the context doesn't contain the answer, respond with "I don't have enough information to answer this question based on the provided context."
-4. Do NOT use general knowledge - stick strictly to the given context
-5. If you're unsure about any detail, admit it rather than guessing
+Your task is to answer the user's question using ONLY the information provided in the context.
 
-{conversation_block}CONTEXT:
+Instructions:
+1. Base your answer only on the provided context.
+2. Use reasonable interpretation and summarization of the context.
+3. Do not invent facts that are not supported by the context.
+4. Write complete, natural sentences.
+5. If the answer is partially available, provide the available information.
+6. If the answer cannot be found in the context, respond:
+   "I don't have enough information to answer this question based on the provided context."
+
+{conversation_block}Context:
 {context}
 
-QUESTION: {query}
+Question:
+{query}
 
-ANSWER:"""
+Answer in 1-3 concise sentences:"""
         
         return prompt
     
