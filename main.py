@@ -98,7 +98,7 @@ class StoreResponse(BaseModel):
 # Initialize services
 user_input_service = UserInputService()
 embedding_service = EmbeddingService()
-vector_store = VectorStoreService()
+vector_store = VectorStoreService(storage_dir=os.getenv("STORAGE_DIR", "storage"))
 llm_service = LLMService()
 rag_stream_service = RagStreamService(vector_store, llm_service)
 

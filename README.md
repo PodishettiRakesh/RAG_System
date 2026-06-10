@@ -65,6 +65,10 @@ This system solves that by:
 - **Vector Store**
   - FAISS (IndexFlatL2)
   - Top-K similarity search
+- **Vector Store** (Persistent)
+  - FAISS (IndexFlatL2) with disk-backed storage
+  - Top-K similarity search
+  - Automatic index persistence (storage/ directory)
 
 - **LLM Service**
   - Flan-T5-Base (770M parameters)
@@ -81,8 +85,7 @@ This system solves that by:
 User Query
 ↓
 Query Embedding
-↓
-Vector Search (Top-K)
+## 📁 Persistent Storage Architecture
 ↓
 Relevant Chunks
 ↓
@@ -100,15 +103,10 @@ Evaluation (Precision, Hallucination, etc.)
 - **Chunk Size (50 words)**  
   Chosen to balance semantic completeness vs retrieval precision.
 
-- **FAISS IndexFlatL2**  
-  Used for exact similarity search with interpretable distance metrics.
 
-- **Flan-T5-Base**  
   Lightweight model enabling local inference while maintaining instruction-following capability.
 
 - **Top-K Retrieval (K=3)**  
-  Provides sufficient context without overwhelming the LLM.
-
 ---
 
 ## ⚙️ Engineering Highlights

@@ -288,6 +288,24 @@ curl http://localhost:8000/store-stats
 
 ### Embedding Strategy
 
+### Persistent Storage Architecture (NEW)
+
+FAISS index and chunks automatically persist to disk:
+```
+storage/
+├── faiss_index.bin       # FAISS vectors
+├── chunks.json           # Text chunks aligned with vectors
+└── metadata.json         # Model info and timestamps
+```
+
+**Key behaviors:**
+- Data persists across server restarts (no loss)
+- Auto-saved after `add_chunks()`
+- Auto-loaded on service initialization
+- Set `STORAGE_DIR` env var to customize path
+
+### Embedding Strategy
+
 **Current**: Deterministic mock embeddings based on text hash
 ```python
 np.random.seed(hash(chunk) % 2**32)  # Deterministic
