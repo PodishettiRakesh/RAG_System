@@ -102,6 +102,18 @@ vector_store = VectorStoreService(storage_dir=os.getenv("STORAGE_DIR", "storage"
 llm_service = LLMService()
 rag_stream_service = RagStreamService(vector_store, llm_service)
 
+# Log active configuration from environment
+print("\n" + "="*70)
+print("🔧 RAG System Configuration (from environment variables)")
+print("="*70)
+print(f"STORAGE_DIR: {os.getenv('STORAGE_DIR', 'storage')} (persistent chunk storage)")
+print(f"CHUNK_MAX_WORDS: {os.getenv('CHUNK_MAX_WORDS', '50')} (words per chunk)")
+print(f"CHUNK_OVERLAP_WORDS: {os.getenv('CHUNK_OVERLAP_WORDS', '5')} (overlap context)")
+print(f"CHUNK_SENTENCE_AWARE: {os.getenv('CHUNK_SENTENCE_AWARE', 'false')} (preserve sentences)")
+chunk_overlap_sentences = os.getenv('CHUNK_OVERLAP_SENTENCES')
+print(f"CHUNK_OVERLAP_SENTENCES: {chunk_overlap_sentences if chunk_overlap_sentences else 'auto-calculated'}")
+print("="*70 + "\n")
+
 SSE_HEADERS = {
     "Cache-Control": "no-cache",
     "Connection": "keep-alive",

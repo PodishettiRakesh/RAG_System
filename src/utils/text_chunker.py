@@ -1,3 +1,4 @@
+import os
 import re
 from typing import List, Optional
 
@@ -5,44 +6,71 @@ from typing import List, Optional
 class TextChunker:
     """Handles text chunking operations."""
     
-    def __init__(self, max_words: int = 50, overlap_words: int = 5):
+    def __init__(self, max_words: Optional[int] = None, overlap_words: Optional[int] = None):
         """
         Initialize the TextChunker.
         
+        Environment variables can override chunking defaults:
+        - CHUNK_MAX_WORDS
+        - CHUNK_OVERLAP_WORDS
+        - CHUNK_SENTENCE_AWARE
+        - CHUNK_OVERLAP_SENTENCES
+        
         Args:
-            max_words (int): Maximum words per chunk (default: 50)
-            overlap_words (int): Number of words to overlap between chunks (default: 5)
+            max_words (int, optional): Maximum words per chunk
+            overlap_words (int, optional): Number of words to overlap between chunks
         """
-        self.max_words = max_words
-        self.overlap_words = min(overlap_words, max_words // 2)  # Prevent overlap > 50% of chunk
+        env_max_words = os.getenv("CHUNK_MAX_WORDS")
+        env_overlap_words = os.getenv("CHUNK_OVERLAP_WORDS")
+        env_sentence_aware = os.getenv("CHUNK_SENTENCE_AWARE")
+        env_overlap_sentences = os.getenv("CHUNK_OVERLAP_SENTENCES")
+
+        self.max_words = int(env_max_words) if env_max_words is not None else (max_words if max_words is not None else 50)
+        overlap_value = int(env_overlap_words) if env_overlap_words is not None else (overlap_words if overlap_words is not None else 5)
+        self.overlap_words = min(overlap_value, self.max_words // 2)  # Prevent overlap > 50% of chunk
+
+        self.default_sentence_aware = self._parse_bool(env_sentence_aware, default=False)
+        self.default_overlap_sentences = int(env_overlap_sentences) if env_overlap_sentences is not None else None
+    
+    @staticmethod
+    def _parse_bool(value: Optional[str], default: bool = False) -> bool:
+        """Parse boolean environment variables from string values."""
+        if value is None:
+            return default
+        return value.strip().lower() in {"1", "true", "yes", "y", "on"}
     
     def chunk_text(
         self,
         text: str,
         overlap_words: Optional[int] = None,
-        sentence_aware: bool = False,
+        sentence_aware: Optional[bool] = None,
         overlap_sentences: Optional[int] = None,
     ) -> List[str]:
         """
         Split text into chunks while preserving sentence boundaries and overlapping context.
         
-        # STRATEGY:
-        # - Normalize newlines and whitespace while preserving text structure
-        # - Optionally keep sentences intact to avoid splitting semantic units
-        # - Use overlap so each chunk retains context from the previous chunk
-        #
-        # EXAMPLE:
-        # Text: "word1 word2 word3 word4 word5 word6 word7"
-        # Max=4, Overlap=2:
-        #   Chunk1: "word1 word2 word3 word4"
-        #   Chunk2: "word3 word4 word5 word6"
-        #   Chunk3: "word5 word6 word7"
+        SENTENCE-AWARE MODE (when enabled):
+        - Splits text into sentences first
+        - Targets ~max_words per chunk (e.g., 50 words)
+        - Allows flexible range: 60%-140% of max_words (e.g., 30-70 for max_words=50)
+        - **Never splits sentences**: Even if a sentence exceeds the max range, it stays intact
+        - Applies word-level overlap: Last N words from previous chunk prepended to next chunk
+        
+        WORD-BASED MODE (default):
+        - Uses sliding window with word-level overlap
+        - Respects exact max_words limit
+        - May split sentences that are very long
+        
+        EXAMPLE (Sentence-Aware with max_words=50, overlap=10):
+        S1 (30 words) + S2 (20 words) = Chunk 1 (50 words)
+        [Last 10 words of Chunk1] + S3 (25 words) + S4 (20 words) = Chunk 2 (55 words)
+        [Last 10 words of Chunk2] + S5 (65 words) = Chunk 3 (75 words, sentence kept intact!)
         
         Args:
             text (str): Input text to chunk (supports multi-line content)
             overlap_words (int, optional): Override default overlap (max 50% of max_words)
             sentence_aware (bool): Keep sentence boundaries intact when chunking
-            overlap_sentences (int, optional): Override sentence overlap count when sentence_aware=True
+            overlap_sentences (int, optional): Deprecated (kept for compatibility)
         
         Returns:
             List[str]: List of text chunks
@@ -59,10 +87,13 @@ class TextChunker:
         # Collapse multiple spaces into single space
         text = re.sub(r'\s+', ' ', text).strip()
         
+        if sentence_aware is None:
+            sentence_aware = self.default_sentence_aware
+        
         if sentence_aware:
-            if overlap_sentences is None:
-                overlap_sentences = max(1, overlap // 5)
-            return self._sentence_aware_chunks(text, overlap_sentences)
+            # Use word-level overlap for sentence-aware chunking
+            # (not sentence-level overlap; _sentence_aware_chunks expects word count)
+            return self._sentence_aware_chunks(text, overlap)
         
         # Extract words while preserving punctuation
         words = re.findall(r'\S+', text)
@@ -91,57 +122,85 @@ class TextChunker:
         return [sentence.strip() for sentence in sentences if sentence.strip()]
     
     def _sentence_aware_chunks(self, text: str, overlap: int) -> List[str]:
-        """Create chunks that keep sentences intact and optionally overlap by sentence boundaries."""
+        """
+        Create chunks from complete sentences with flexible sizing.
+        
+        Strategy:
+        - Target chunk size is max_words (e.g., 50)
+        - Allow flexible range: [min_words, max_words_range] where:
+          - min_words = max_words * 0.6 (e.g., 30 for max_words=50)
+          - max_words_range = max_words * 1.4 (e.g., 70 for max_words=50)
+        - If a sentence exceeds max_words_range, keep it as single chunk (never split sentences)
+        - Apply word-level overlap between chunks (from last N words of previous chunk)
+        """
         sentences = self._split_into_sentences(text)
         if not sentences:
             return []
         
-        # Build chunks from full sentences without splitting sentences across boundaries
-        chunk_sentence_groups: List[List[str]] = []
-        current_group: List[str] = []
-        current_count = 0
+        # Define flexible range for chunk size
+        min_words = int(self.max_words * 0.6)  # Lower bound (e.g., 30 for max_words=50)
+        max_words_range = int(self.max_words * 1.4)  # Upper bound (e.g., 70 for max_words=50)
+        
+        # Step 1: Build chunks from complete sentences, respecting the flexible range
+        chunks = []
+        current_chunk_sentences = []
+        current_word_count = 0
         
         for sentence in sentences:
             sentence_words = re.findall(r'\S+', sentence)
             if not sentence_words:
                 continue
             
-            if current_count + len(sentence_words) <= self.max_words:
-                current_group.append(sentence)
-                current_count += len(sentence_words)
+            sentence_word_count = len(sentence_words)
+            
+            # If the sentence itself exceeds max_words_range, keep it as a separate chunk (never split)
+            if sentence_word_count > max_words_range:
+                # Finalize current chunk if it has content
+                if current_chunk_sentences:
+                    chunks.append(' '.join(current_chunk_sentences))
+                    current_chunk_sentences = []
+                    current_word_count = 0
+                # Add the oversized sentence as its own chunk
+                chunks.append(sentence)
+            elif current_word_count + sentence_word_count <= max_words_range:
+                # Sentence fits in current chunk
+                current_chunk_sentences.append(sentence)
+                current_word_count += sentence_word_count
             else:
-                if current_group:
-                    chunk_sentence_groups.append(current_group)
-                
-                if len(sentence_words) > self.max_words:
-                    # Very long sentence: split by words as a fallback, preserving chunk size
-                    for i in range(0, len(sentence_words), self.max_words):
-                        chunk = ' '.join(sentence_words[i:i + self.max_words])
-                        chunk_sentence_groups.append([chunk])
-                    current_group = []
-                    current_count = 0
-                else:
-                    current_group = [sentence]
-                    current_count = len(sentence_words)
+                # Sentence doesn't fit; finalize current chunk and start new one
+                if current_chunk_sentences:
+                    chunks.append(' '.join(current_chunk_sentences))
+                current_chunk_sentences = [sentence]
+                current_word_count = sentence_word_count
         
-        if current_group:
-            chunk_sentence_groups.append(current_group)
+        # Finalize last chunk
+        if current_chunk_sentences:
+            chunks.append(' '.join(current_chunk_sentences))
         
-        if overlap <= 0 or len(chunk_sentence_groups) <= 1:
-            return [' '.join(group) for group in chunk_sentence_groups]
+        # Step 2: Apply word-level overlap between chunks
+        if overlap <= 0 or len(chunks) <= 1:
+            return chunks
         
-        # Overlap by sentence groups to preserve sentence integrity
-        overlap_sentences = max(1, overlap)
-        overlapped_chunks: List[str] = []
-        for idx, group in enumerate(chunk_sentence_groups):
-            if idx == 0:
-                overlapped_chunks.append(' '.join(group))
-                continue
-            prev_group = chunk_sentence_groups[idx - 1]
-            overlap_segment = prev_group[-overlap_sentences:]
-            overlapped_chunks.append(' '.join(overlap_segment + group))
+        final_chunks = []
+        prev_chunk_words = []
         
-        return overlapped_chunks
+        for chunk in chunks:
+            chunk_words = re.findall(r'\S+', chunk)
+            
+            if not prev_chunk_words:
+                # First chunk: no overlap from previous
+                final_chunks.append(chunk)
+            else:
+                # Add overlap from previous chunk (last N words)
+                overlap_count = min(overlap, len(prev_chunk_words))
+                overlap_words = prev_chunk_words[-overlap_count:]
+                combined_words = overlap_words + chunk_words
+                final_chunks.append(' '.join(combined_words))
+            
+            # Save chunk words for next iteration's overlap
+            prev_chunk_words = chunk_words
+        
+        return final_chunks
     
     def print_chunks(self, chunks: List[str]) -> None:
         """Print chunks with numbering and details."""
