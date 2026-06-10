@@ -293,6 +293,59 @@ RAG_System/
 
 ---
 
+## ⚙️ Configuration (Environment Variables)
+
+The system reads configuration from environment variables. Copy `.env.example` to `.env` and customize:
+
+```bash
+cp .env.example .env
+```
+
+### Storage Configuration
+```
+STORAGE_DIR=storage                    # Directory for persistent FAISS index and chunks
+```
+
+### Chunking Strategy Configuration
+```
+CHUNK_MAX_WORDS=50                     # Maximum words per chunk
+CHUNK_OVERLAP_WORDS=5                  # Words to overlap between chunks (context preservation)
+CHUNK_SENTENCE_AWARE=false             # Enable sentence-aware chunking (keeps sentences intact)
+CHUNK_OVERLAP_SENTENCES=1              # Sentences to overlap (auto-calculated if not set)
+```
+
+### How It Works
+- **CHUNK_MAX_WORDS**: Controls chunk granularity (smaller = more chunks, larger = more context per chunk)
+- **CHUNK_OVERLAP_WORDS**: Prevents information loss at chunk boundaries by overlapping context
+- **CHUNK_SENTENCE_AWARE**: When `true`, prevents sentences from being split across chunks
+- **CHUNK_OVERLAP_SENTENCES**: Number of sentences to overlap (only used when `CHUNK_SENTENCE_AWARE=true`)
+
+### Example Configurations
+
+**Standard word-based chunking (default):**
+```
+CHUNK_MAX_WORDS=50
+CHUNK_OVERLAP_WORDS=5
+CHUNK_SENTENCE_AWARE=false
+```
+
+**Sentence-aware chunking (preserve semantic units):**
+```
+CHUNK_MAX_WORDS=100
+CHUNK_OVERLAP_WORDS=10
+CHUNK_SENTENCE_AWARE=true
+CHUNK_OVERLAP_SENTENCES=2
+```
+
+**Large context chunks (fewer, longer chunks):**
+```
+CHUNK_MAX_WORDS=200
+CHUNK_OVERLAP_WORDS=20
+CHUNK_SENTENCE_AWARE=true
+```
+
+---
+
 ## 🧩 Key Learning
 
 - High retrieval quality directly reduces hallucination risk
